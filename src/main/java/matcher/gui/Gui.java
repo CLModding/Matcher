@@ -13,8 +13,7 @@ import javafx.scene.control.ProgressBar;
 import javafx.scene.layout.*;
 import javafx.stage.*;
 import javafx.stage.FileChooser.ExtensionFilter;
-import jfxtras.styles.jmetro.JMetro;
-import jfxtras.styles.jmetro.Style;
+import jfxtras.styles.jmetro.*;
 import matcher.Matcher;
 import matcher.NameType;
 import matcher.config.Config;
@@ -295,11 +294,14 @@ public class Gui extends Application {
 		stage.initOwner(this.scene.getWindow());
 		VBox pane = new VBox(GuiConstants.padding);
 
+		pane.getStyleClass().add(JMetroStyleClass.BACKGROUND);
+
 		stage.setScene(new Scene(pane));
 		stage.initModality(Modality.APPLICATION_MODAL);
 		stage.setOnCloseRequest(event -> event.consume());
 		stage.setResizable(false);
 		stage.setTitle("Operation progress");
+		new JMetro(stage.getScene(), getJMetroStyle());
 
 		pane.setPadding(new Insets(GuiConstants.padding));
 
