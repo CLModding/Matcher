@@ -170,9 +170,11 @@ public abstract class MemberInstance<T extends MemberInstance<T>> implements Mat
 	}
 
 	public boolean hasHierarchyMatch() {
-		assert hierarchyData != null; // only available for input classes
-
-		return hierarchyData.matchedHierarchy != null;
+		if (hierarchyData == null) {
+			return false;
+		} else {
+			return hierarchyData.matchedHierarchy != null;
+		}
 	}
 
 	public T getHierarchyMatch() {
