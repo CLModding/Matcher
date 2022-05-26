@@ -356,8 +356,17 @@ public class ClassifierUtil {
 			return dirA == dirB ? COMPARED_SIMILAR : COMPARED_DISTINCT;
 		}
 		case AbstractInsnNode.LABEL: {
-			// TODO: implement
-			break;
+			if (!(insnA instanceof LabelNode) || !(insnB instanceof LabelNode)) {
+				// Both have to be labels to compare with eachother
+				break;
+			}
+			LabelNode a = (LabelNode) insnA;
+			LabelNode b = (LabelNode) insnB;
+
+			int dirA = posProvider.applyAsInt(listA, a);
+			int dirB = posProvider.applyAsInt(listB, b);
+
+			return dirA == dirB ? COMPARED_SIMILAR : COMPARED_DISTINCT;
 		}
 		case AbstractInsnNode.LDC_INSN: {
 			LdcInsnNode a = (LdcInsnNode) insnA;
@@ -431,8 +440,13 @@ public class ClassifierUtil {
 			break;
 		}
 		case AbstractInsnNode.LINE: {
-			// TODO: implement
-			break;
+			if (!(insnA instanceof LineNumberNode) || !(insnB instanceof LineNumberNode)) {
+				break;
+			}
+			LineNumberNode a = (LineNumberNode) insnA;
+			LineNumberNode b = (LineNumberNode) insnB;
+
+			return a.line == b.line ? COMPARED_SIMILAR : COMPARED_DISTINCT;
 		}
 		}
 
