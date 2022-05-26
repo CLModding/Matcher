@@ -7,7 +7,8 @@ public enum MappingField {
 	MAPPED("Mapped", NameType.MAPPED_PLAIN),
 	UID("UID", NameType.UID_PLAIN),
 	AUX("AUX", NameType.AUX_PLAIN),
-	AUX2("AUX2", NameType.AUX2_PLAIN);
+	AUX2("AUX2", NameType.AUX2_PLAIN),
+	AUX3("AUX3", NameType.AUX3_PLAIN);
 
 	MappingField(String name, NameType type) {
 		this.name = name;

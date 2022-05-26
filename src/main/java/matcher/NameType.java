@@ -8,6 +8,7 @@ public enum NameType {
 	MAPPED(false, true, false, 0),
 	AUX(false, false, false, 1),
 	AUX2(false, false, false, 2),
+	AUX3(false, false, false, 3),
 
 	MAPPED_PLAIN(true, true, false, 0),
 	MAPPED_AUX_PLAIN(true, true, false, 1),
@@ -19,7 +20,8 @@ public enum NameType {
 	TMP_PLAIN(true, false, true, 0),
 	LOCTMP_PLAIN(true, false, false, 0),
 	AUX_PLAIN(true, false, false, 1),
-	AUX2_PLAIN(true, false, false, 2);
+	AUX2_PLAIN(true, false, false, 2),
+	AUX3_PLAIN(true, false, false, 3);
 
 	NameType(boolean plain, boolean mapped, boolean tmp, int aux) {
 		this.plain = plain;
@@ -124,7 +126,7 @@ public enum NameType {
 		return VALUES[NameType.AUX.ordinal() + index];
 	}
 
-	public static final int AUX_COUNT = 2;
+	public static final int AUX_COUNT = 3;
 
 	private static final NameType[] VALUES = values();
 

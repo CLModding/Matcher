@@ -222,6 +222,7 @@ public class Mappings {
 							break;
 						case AUX:
 						case AUX2:
+						case AUX3:
 							if (!cls.hasAuxName(fieldTarget.type.getAuxIndex()) || replace) {
 								if (ClassInstance.hasOuterName(name)) {
 									name = ClassInstance.getInnerName(name);
@@ -282,6 +283,7 @@ public class Mappings {
 							break;
 						case AUX:
 						case AUX2:
+						case AUX3:
 							if (!field.hasAuxName(fieldTarget.type.getAuxIndex()) || replace) {
 								for (FieldInstance f : field.getAllHierarchyMembers()) {
 									f.setAuxName(fieldTarget.type.getAuxIndex(), name);
@@ -326,6 +328,7 @@ public class Mappings {
 							break;
 						case AUX:
 						case AUX2:
+						case AUX3:
 							if (!method.hasAuxName(fieldTarget.type.getAuxIndex()) || replace) {
 								for (MethodInstance m : method.getAllHierarchyMembers()) {
 									m.setAuxName(fieldTarget.type.getAuxIndex(), name);
@@ -365,6 +368,7 @@ public class Mappings {
 							break;
 						case AUX:
 						case AUX2:
+						case AUX3:
 							if (!arg.hasAuxName(fieldTarget.type.getAuxIndex()) || replace) arg.setAuxName(fieldTarget.type.getAuxIndex(), name);
 							break;
 						case UID:
@@ -382,6 +386,7 @@ public class Mappings {
 							break;
 						case AUX:
 						case AUX2:
+						case AUX3:
 							if (!var.hasAuxName(fieldTarget.type.getAuxIndex()) || replace) var.setAuxName(fieldTarget.type.getAuxIndex(), name);
 							break;
 						case UID:
@@ -438,6 +443,7 @@ public class Mappings {
 		case MAPPED:
 		case AUX:
 		case AUX2:
+		case AUX3:
 		case UID:
 			ClassInstance ret = env.getClsByName(name, type.type);
 
@@ -769,8 +775,10 @@ public class Mappings {
 			return "named-tmp";
 		case AUX:
 		case AUX2:
+		case AUX3:
 		case AUX_PLAIN:
 		case AUX2_PLAIN:
+		case AUX3_PLAIN:
 			return type.getAuxIndex() > 0 ? String.format("aux%d", type.getAuxIndex()) : "aux";
 		case MAPPED_AUX_PLAIN:
 			return "named-aux";

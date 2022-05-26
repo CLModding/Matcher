@@ -391,6 +391,8 @@ public class MatchPaneDst extends SplitPane implements IFwdGuiComponent, ISelect
 			case "auxname":
 			case "aux2":
 			case "aux2name":
+			case "aux3":
+			case "aux3name":
 				opTypeA = OP_TYPE_MATCHABLE;
 				break;
 			case "supercls":
@@ -512,6 +514,10 @@ public class MatchPaneDst extends SplitPane implements IFwdGuiComponent, ISelect
 			case "aux2":
 			case "aux2name":
 				stack.add(((Matchable<?>) opA).getName(NameType.AUX2_PLAIN));
+				break;
+			case "aux3":
+			case "aux3name":
+				stack.add(((Matchable<?>) opA).getName(NameType.AUX3_PLAIN));
 				break;
 			case "supercls":
 				stack.add(((ClassInstance) opA).getSuperClass());

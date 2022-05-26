@@ -29,4 +29,6 @@ module matcher {
     requires org.jfxtras.styles.jmetro;
 
     uses matcher.Plugin;
+
+	opens matcher;
 }

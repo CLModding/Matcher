@@ -688,7 +688,7 @@ public class Matcher {
 		if (ranking.size() == 1) {
 			return true;
 		} else {
-				// If we have more than one, and it's a method arg/var, check if the first is within the threshold
+			// If we have more than one, and it's a method arg/var, check if the first is within the threshold
 			if (ranking.size() >= 1) {
 				if ((getScore(ranking.get(0).getScore(), maxScore) * (1 - relThreshold)) >= absThreshold) {
 					return true;
