@@ -20,6 +20,8 @@ public class BytecodeTab extends WebViewTab {
 		this.gui = gui;
 		this.selectionProvider = selectionProvider;
 		this.unmatchedTmp = unmatchedTmp;
+
+		update(null, true);
 	}
 
 	@Override
@@ -31,9 +33,7 @@ public class BytecodeTab extends WebViewTab {
 	public void onViewChange() {
 		ClassInstance cls = selectionProvider.getSelectedClass();
 
-		if (cls != null) {
-			update(cls, true);
-		}
+		update(cls, true);
 	}
 
 	private void update(ClassInstance cls, boolean isRefresh) {
