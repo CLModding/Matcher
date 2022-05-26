@@ -1,74 +1,75 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<title>src</title>
-	<meta charset="utf-8">
-	<style>
-		.light {
-			--selected-color: #fbf3d2;
-			--comment-color: #3F7F5F;
-			--keyword-color: #0033B3;
-			--string-color: #2A00FF;
-			--field-color: #871094;
-			--annotation-color: #9e880d;
-			--variable-color: #000000;
-			--background-color: #ffffff;
-			--foreground-color: #000000;
-			--javadoc-color: #8c8c8c;
-			--number-color: #1750eb;
-		}
+    <title>src</title>
+    <meta charset="utf-8">
+    <style>
+        .light {
+            --selected-color: #fbf3d2;
+            --comment-color: #3F7F5F;
+            --keyword-color: #0033B3;
+            --string-color: #2A00FF;
+            --field-color: #871094;
+            --annotation-color: #9e880d;
+            --variable-color: #000000;
+            --background-color: #ffffff;
+            --foreground-color: #000000;
+            --javadoc-color: #8c8c8c;
+            --number-color: #1750eb;
+        }
 
-		.dark {
-			--background-color: #2b2b2b;
-			--selected-color: #214283;
-			--comment-color: #808080;
-			--keyword-color: #cc7832;
-			--string-color: #6a8759;
-			--field-color: #9876aa;
-			--annotation-color: #bab428;
-			--variable-color: #ffc66d;
-			--javadoc-color: #629755;
-			--foreground-color: #a9b7c6;
-			--number-color: #6897bb;
-		}
-		body {
-			font-family: "Fira Code Medium", monospace;
-			white-space: pre;
-			margin: 0.2rem;
-			tab-size: 4;
-			color: var(--foreground-color);
-			background-color: var(--background-color);
-		}
+        .dark {
+            --background-color: #2b2b2b;
+            --selected-color: #214283;
+            --comment-color: #808080;
+            --keyword-color: #cc7832;
+            --string-color: #6a8759;
+            --field-color: #9876aa;
+            --annotation-color: #bab428;
+            --variable-color: #ffc66d;
+            --javadoc-color: #629755;
+            --foreground-color: #a9b7c6;
+            --number-color: #6897bb;
+        }
 
-		.selected {
-			background-color: #fbf3d2;
-		}
-		
-		.comment {
-			color: #3F7F5F;
-		}
+        body {
+            font-family: "Fira Code Medium", monospace;
+            white-space: pre;
+            margin: 0.2rem;
+            tab-size: 4;
+            color: var(--foreground-color);
+            background-color: var(--background-color);
+        }
 
-		.keyword {
-			color: #7F0055;
-			font-weight: bold;
-		}
+        .selected {
+            background-color: var(--selected-color);
+        }
 
-		.string {
-			color: #2A00FF;
-		}
+        .comment {
+            color: var(--comment-color);
+        }
 
-		.field {
-			color: #0000C0;
-		}
+        .keyword {
+            color: var(--keyword-color);
+            font-weight: bold;
+        }
 
-		.annotation {
-			color: #646464;
-		}
+        .string {
+			color: var(--string-color);
+        }
 
-		.variable {
-			color: #6A3E3E;
-		}
-	</style>
+        .field {
+			color: var(--field-color);
+        }
+
+        .annotation {
+			color: var(--annotation-color);
+        }
+
+        .variable {
+			color: var(--variable-color);
+        }
+    </style>
 </head>
 <body class="%theme%">%text%</body>
 </html>
