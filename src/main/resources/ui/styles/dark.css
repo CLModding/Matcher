@@ -7,6 +7,10 @@
     -fx-selection-bar-non-focused: #3C3F41;
 }
 
+.grid-pane {
+
+}
+
 .split-pane {
     -fx-base: #3C3F41;
 }

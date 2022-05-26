@@ -1,5 +1,18 @@
 package matcher.gui.menu;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Stream;
+
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.control.Alert.AlertType;
@@ -7,6 +20,10 @@ import javafx.scene.control.*;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
 import javafx.stage.Window;
+
+import net.fabricmc.mappingio.MappingReader;
+import net.fabricmc.mappingio.format.MappingFormat;
+
 import matcher.Util;
 import matcher.config.Config;
 import matcher.config.ProjectConfig;
@@ -15,8 +32,6 @@ import matcher.gui.Gui.SelectedFile;
 import matcher.gui.menu.LoadMappingsPane.MappingsLoadSettings;
 import matcher.gui.menu.LoadProjectPane.ProjectLoadSettings;
 import matcher.gui.menu.SaveMappingsPane.MappingsSaveSettings;
-import matcher.mapping.MappingFormat;
-import matcher.mapping.MappingReader;
 import matcher.mapping.Mappings;
 import matcher.serdes.MatchesIo;
 import matcher.type.ClassEnvironment;
@@ -63,7 +78,7 @@ public class FileMenu extends Menu {
 
 		menuItem = new MenuItem("Save mappings");
 		getItems().add(menuItem);
-		menuItem.setOnAction(event -> saveMappings(MappingFormat.TINY_2));
+		menuItem.setOnAction(event -> saveMappings(null));
 
 		menuItem = new MenuItem("Save mappings (Enigma)");
 		getItems().add(menuItem);
@@ -94,24 +109,30 @@ public class FileMenu extends Menu {
 	}
 
 	private void newProject() {
-		newProject(Config.getProjectConfig());
+		newProject(Config.getProjectConfig(), true);
 	}
 
-	public CompletableFuture<Boolean> newProject(ProjectConfig config) {
-		Dialog<ProjectConfig> dialog = new Dialog<>();
-		//dialog.initModality(Modality.APPLICATION_MODAL);
-		dialog.setResizable(true);
-		dialog.setTitle("Project configuration");
-		dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+	public CompletableFuture<Boolean> newProject(ProjectConfig config, boolean showConfigDialog) {
+		ProjectConfig newConfig;
 
-		Node okButton = dialog.getDialogPane().lookupButton(ButtonType.OK);
-		NewProjectPane content = new NewProjectPane(config, dialog.getOwner(), okButton);
+		if (showConfigDialog) {
+			Dialog<ProjectConfig> dialog = new Dialog<>();
+			//dialog.initModality(Modality.APPLICATION_MODAL);
+			dialog.setResizable(true);
+			dialog.setTitle("Project configuration");
+			dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
 
-		dialog.getDialogPane().setContent(content);
-		dialog.setResultConverter(button -> button == ButtonType.OK ? content.createConfig() : null);
+			Node okButton = dialog.getDialogPane().lookupButton(ButtonType.OK);
+			NewProjectPane content = new NewProjectPane(config, dialog.getOwner(), okButton);
 
-		ProjectConfig newConfig = dialog.showAndWait().orElse(null);
-		if (newConfig == null || !newConfig.isValid()) return CompletableFuture.completedFuture(false);
+			dialog.getDialogPane().setContent(content);
+			dialog.setResultConverter(button -> button == ButtonType.OK ? content.createConfig() : null);
+
+			newConfig = dialog.showAndWait().orElse(null);
+			if (newConfig == null || !newConfig.isValid()) return CompletableFuture.completedFuture(false);
+		} else {
+			newConfig = config;
+		}
 
 		Config.setProjectConfig(newConfig);
 		Config.saveAsLast();
@@ -129,7 +150,7 @@ public class FileMenu extends Menu {
 				() -> gui.onProjectChange(),
 				exc -> {
 					exc.printStackTrace();
-					ret.complete(false);
+					ret.completeExceptionally(exc);
 				});
 
 		return ret;
@@ -180,7 +201,7 @@ public class FileMenu extends Menu {
 		Path file;
 
 		if (format == null || format.hasSingleFile()) {
-			SelectedFile res = Gui.requestMappingFile("Select mapping file", window, format, true); // TODO: pre-select format if non-null
+			SelectedFile res = Gui.requestFile("Select mapping file", window, getMappingLoadExtensionFilters(), true); // TODO: pre-select format if non-null
 			if (res == null) return; // aborted
 
 			file = res.path;
@@ -192,7 +213,7 @@ public class FileMenu extends Menu {
 		if (file == null) return;
 
 		try {
-			String[] namespaces = MappingReader.getNamespaces(file, format);
+			List<String> namespaces = MappingReader.getNamespaces(file, format);
 
 			Dialog<MappingsLoadSettings> dialog = new Dialog<>();
 			//dialog.initModality(Modality.APPLICATION_MODAL);
@@ -225,16 +246,47 @@ public class FileMenu extends Menu {
 		gui.onMappingChange();
 	}
 
+	private static List<ExtensionFilter> getMappingLoadExtensionFilters() {
+		MappingFormat[] formats = MappingFormat.values();
+		List<ExtensionFilter> ret = new ArrayList<>(formats.length + 2);
+		List<String> supportedExtensions = new ArrayList<>(formats.length);
+
+		for (MappingFormat format : formats) {
+			if (format.hasSingleFile()) supportedExtensions.add(format.getGlobPattern());
+		}
+
+		ret.add(new FileChooser.ExtensionFilter("All supported", supportedExtensions));
+		ret.add(new FileChooser.ExtensionFilter("Any", "*.*"));
+
+		for (MappingFormat format : formats) {
+			if (format.hasSingleFile()) ret.add(new FileChooser.ExtensionFilter(format.name, format.getGlobPattern()));
+		}
+
+		return ret;
+	}
+
 	private void saveMappings(MappingFormat format) {
 		Window window = gui.getScene().getWindow();
 		Path path;
 
 		if (format == null || format.hasSingleFile()) {
-			SelectedFile file = Gui.requestMappingFile("Save mapping file", window, format, false);
+			FileChooser fileChooser = new FileChooser();
+			fileChooser.setTitle("Save mapping file");
+
+			for (MappingFormat f : MappingFormat.values()) {
+				if (f.hasSingleFile()) {
+					FileChooser.ExtensionFilter filter = new FileChooser.ExtensionFilter(f.name, "*."+f.fileExt);
+					fileChooser.getExtensionFilters().add(filter);
+
+					if (f == format) fileChooser.setSelectedExtensionFilter(filter);
+				}
+			}
+
+			File file = fileChooser.showSaveDialog(window);
 			if (file == null) return;
 
-			path = file.path;
-			format = getFormat(file.filter.getDescription());
+			path = file.toPath();
+			format = getFormat(fileChooser.getSelectedExtensionFilter().getDescription());
 		} else {
 			path = Gui.requestDir("Save mapping dir", window);
 			if (path == null) return;
@@ -292,7 +344,7 @@ public class FileMenu extends Menu {
 				}
 
 				if (!Mappings.save(savePath, saveFormat, (settings.a ? env.getEnvA() : env.getEnvB()),
-						settings.nsTypes, settings.nsNames, settings.verbosity, settings.fieldsFirst)) {
+						settings.nsTypes, settings.nsNames, settings.verbosity, settings.forAnyInput, settings.fieldsFirst)) {
 					gui.showAlert(AlertType.WARNING, "Mapping save warning", "No mappings to save", "There are currently no names mapped to matched classes, so saving was aborted.");
 				}
 			} catch (IOException e) {

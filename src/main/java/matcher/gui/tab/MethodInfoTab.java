@@ -59,6 +59,7 @@ public class MethodInfoTab extends Tab implements IGuiComponent {
 
 		row = addRow("UID", uidLabel, grid, row);
 		row = addRow("Name obf.", nameObfLabel, grid, row);
+		row = addRow("Inputs", inputLabel, grid, row);
 		row = addRow("Args", argLabel, grid, row);
 		row = addRow("Ret type", retTypeLabel, grid, row);
 		row = addRow("Access", accessLabel, grid, row);
@@ -117,6 +118,7 @@ public class MethodInfoTab extends Tab implements IGuiComponent {
 
 			uidLabel.setText("-");
 			nameObfLabel.setText("-");
+			inputLabel.setText("-");
 			argLabel.setText("-");
 			retTypeLabel.setText("-");
 			accessLabel.setText("-");
@@ -145,6 +147,7 @@ public class MethodInfoTab extends Tab implements IGuiComponent {
 
 			uidLabel.setText(method.getUid() >= 0 ? Integer.toString(method.getUid()) : "-");
 			nameObfLabel.setText(Boolean.toString(method.isNameObfuscated()));
+			inputLabel.setText(ClassInfoTab.getInputPaths(method.getCls(), node -> node.methods.stream().anyMatch(m -> m.name.equals(method.getName()) && m.desc.equals(method.getDesc()))));
 			argLabel.setText(Arrays.stream(method.getArgs()).map(a -> getVarName(a, nameType)).collect(Collectors.joining("\n")));
 			retTypeLabel.setText(getName(method.getRetType(), nameType));
 			accessLabel.setText(Util.formatAccessFlags(method.getAccess(), AFElementType.Method));
@@ -193,6 +196,7 @@ public class MethodInfoTab extends Tab implements IGuiComponent {
 	private final Label[] auxNameLabels = new Label[NameType.AUX_COUNT];
 	private final Label uidLabel = new Label();
 	private final Label nameObfLabel = new Label();
+	private final Label inputLabel = new Label();
 	private final Label argLabel = new Label();
 	private final Label retTypeLabel = new Label();
 	private final Label accessLabel = new Label();

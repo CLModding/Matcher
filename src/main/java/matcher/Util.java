@@ -17,6 +17,10 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
+import org.objectweb.asm.Handle;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.tree.MethodInsnNode;
+
 public class Util {
 	public static <T> Set<T> newIdentityHashSet() {
 		return Collections.newSetFromMap(new IdentityHashMap<>());//new IdentityHashSet<>();
@@ -38,10 +42,22 @@ public class Util {
 	}
 
 	public static FileSystem iterateJar(Path archive, boolean autoClose, Consumer<Path> handler) {
+		boolean existing = false;
 		FileSystem fs = null;
 
 		try {
-			fs = FileSystems.newFileSystem(new URI("jar:"+archive.toUri().toString()), Collections.emptyMap());
+			URI uri = new URI("jar:"+archive.toUri().toString());
+
+			synchronized (Util.class) {
+				try {
+					fs = FileSystems.getFileSystem(uri);
+					existing = true;
+					autoClose = false;
+				} catch (FileSystemNotFoundException e) {
+					fs = FileSystems.newFileSystem(uri, Collections.emptyMap());
+					existing = false;
+				}
+			}
 
 			Files.walkFileTree(fs.getPath("/"), new SimpleFileVisitor<Path>() {
 				@Override
@@ -66,7 +82,7 @@ public class Util {
 
 		if (autoClose) closeSilently(fs);
 
-		return fs;
+		return autoClose || existing ? null : fs;
 	}
 
 	public static boolean clearDir(Path path, Predicate<Path> disallowed) throws IOException {
@@ -196,7 +212,8 @@ public class Util {
 	}
 
 	public static boolean isIrrelevantBsm(Handle bsm) {
-		return bsm.getOwner().equals("java/lang/invoke/StringConcatFactory");
+		return bsm.getOwner().equals("java/lang/invoke/StringConcatFactory")
+				|| bsm.getOwner().equals("java/lang/runtime/ObjectMethods");
 	}
 
 	public static boolean isValidJavaIdentifier(String s) {

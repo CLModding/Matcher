@@ -1,35 +1,167 @@
+/*
+ * original license of this file's origin (com.github.javaparser.printer.PrettyPrintVisitor) before converting from
+ * plain text to html and tweaking output formatting:
+ * Copyright (C) 2007-2010 Júlio Vilmar Gesser.
+ * Copyright (C) 2011, 2013-2021 The JavaParser Team.
+ *
+ * This file is part of JavaParser.
+ *
+ * JavaParser can be used either under the terms of
+ * a) the GNU Lesser General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ * b) the terms of the Apache License
+ *
+ * You should have received a copy of both licenses in LICENCE.LGPL and
+ * LICENCE.APACHE. Please refer to those files for details.
+ *
+ * JavaParser is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ */
+
 package matcher.srcprocess;
-
-import com.github.javaparser.ast.*;
-import com.github.javaparser.ast.body.*;
-import com.github.javaparser.ast.comments.BlockComment;
-import com.github.javaparser.ast.comments.Comment;
-import com.github.javaparser.ast.comments.JavadocComment;
-import com.github.javaparser.ast.comments.LineComment;
-import com.github.javaparser.ast.expr.*;
-import com.github.javaparser.ast.modules.*;
-import com.github.javaparser.ast.nodeTypes.NodeWithName;
-import com.github.javaparser.ast.nodeTypes.NodeWithTraversableScope;
-import com.github.javaparser.ast.nodeTypes.NodeWithTypeArguments;
-import com.github.javaparser.ast.nodeTypes.NodeWithVariables;
-import com.github.javaparser.ast.stmt.*;
-import com.github.javaparser.ast.type.*;
-import com.github.javaparser.ast.visitor.Visitable;
-import com.github.javaparser.ast.visitor.VoidVisitor;
-import com.github.javaparser.printer.PrettyPrintVisitor;
-import com.github.javaparser.printer.PrettyPrinterConfiguration;
-import com.github.javaparser.printer.PrettyPrinterConfiguration.IndentType;
-import com.github.javaparser.printer.SourcePrinter;
-import com.github.javaparser.utils.Utils;
-import matcher.type.FieldInstance;
-import matcher.type.MethodInstance;
-
-import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.github.javaparser.ast.Node.Parsedness.UNPARSABLE;
 import static com.github.javaparser.utils.PositionUtils.sortByBeginPosition;
 import static com.github.javaparser.utils.Utils.isNullOrEmpty;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
+
+import com.github.javaparser.ast.ArrayCreationLevel;
+import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.ImportDeclaration;
+import com.github.javaparser.ast.Modifier;
+import com.github.javaparser.ast.Modifier.Keyword;
+import com.github.javaparser.ast.Node;
+import com.github.javaparser.ast.NodeList;
+import com.github.javaparser.ast.PackageDeclaration;
+import com.github.javaparser.ast.body.AnnotationDeclaration;
+import com.github.javaparser.ast.body.AnnotationMemberDeclaration;
+import com.github.javaparser.ast.body.BodyDeclaration;
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.CompactConstructorDeclaration;
+import com.github.javaparser.ast.body.ConstructorDeclaration;
+import com.github.javaparser.ast.body.EnumConstantDeclaration;
+import com.github.javaparser.ast.body.EnumDeclaration;
+import com.github.javaparser.ast.body.FieldDeclaration;
+import com.github.javaparser.ast.body.InitializerDeclaration;
+import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.Parameter;
+import com.github.javaparser.ast.body.ReceiverParameter;
+import com.github.javaparser.ast.body.RecordDeclaration;
+import com.github.javaparser.ast.body.TypeDeclaration;
+import com.github.javaparser.ast.body.VariableDeclarator;
+import com.github.javaparser.ast.comments.BlockComment;
+import com.github.javaparser.ast.comments.Comment;
+import com.github.javaparser.ast.comments.JavadocComment;
+import com.github.javaparser.ast.comments.LineComment;
+import com.github.javaparser.ast.expr.AnnotationExpr;
+import com.github.javaparser.ast.expr.ArrayAccessExpr;
+import com.github.javaparser.ast.expr.ArrayCreationExpr;
+import com.github.javaparser.ast.expr.ArrayInitializerExpr;
+import com.github.javaparser.ast.expr.AssignExpr;
+import com.github.javaparser.ast.expr.BinaryExpr;
+import com.github.javaparser.ast.expr.BooleanLiteralExpr;
+import com.github.javaparser.ast.expr.CastExpr;
+import com.github.javaparser.ast.expr.CharLiteralExpr;
+import com.github.javaparser.ast.expr.ClassExpr;
+import com.github.javaparser.ast.expr.ConditionalExpr;
+import com.github.javaparser.ast.expr.DoubleLiteralExpr;
+import com.github.javaparser.ast.expr.EnclosedExpr;
+import com.github.javaparser.ast.expr.Expression;
+import com.github.javaparser.ast.expr.FieldAccessExpr;
+import com.github.javaparser.ast.expr.InstanceOfExpr;
+import com.github.javaparser.ast.expr.IntegerLiteralExpr;
+import com.github.javaparser.ast.expr.LambdaExpr;
+import com.github.javaparser.ast.expr.LongLiteralExpr;
+import com.github.javaparser.ast.expr.MarkerAnnotationExpr;
+import com.github.javaparser.ast.expr.MemberValuePair;
+import com.github.javaparser.ast.expr.MethodCallExpr;
+import com.github.javaparser.ast.expr.MethodReferenceExpr;
+import com.github.javaparser.ast.expr.Name;
+import com.github.javaparser.ast.expr.NameExpr;
+import com.github.javaparser.ast.expr.NormalAnnotationExpr;
+import com.github.javaparser.ast.expr.NullLiteralExpr;
+import com.github.javaparser.ast.expr.ObjectCreationExpr;
+import com.github.javaparser.ast.expr.PatternExpr;
+import com.github.javaparser.ast.expr.SimpleName;
+import com.github.javaparser.ast.expr.SingleMemberAnnotationExpr;
+import com.github.javaparser.ast.expr.StringLiteralExpr;
+import com.github.javaparser.ast.expr.SuperExpr;
+import com.github.javaparser.ast.expr.SwitchExpr;
+import com.github.javaparser.ast.expr.TextBlockLiteralExpr;
+import com.github.javaparser.ast.expr.ThisExpr;
+import com.github.javaparser.ast.expr.TypeExpr;
+import com.github.javaparser.ast.expr.UnaryExpr;
+import com.github.javaparser.ast.expr.VariableDeclarationExpr;
+import com.github.javaparser.ast.modules.ModuleDeclaration;
+import com.github.javaparser.ast.modules.ModuleExportsDirective;
+import com.github.javaparser.ast.modules.ModuleOpensDirective;
+import com.github.javaparser.ast.modules.ModuleProvidesDirective;
+import com.github.javaparser.ast.modules.ModuleRequiresDirective;
+import com.github.javaparser.ast.modules.ModuleUsesDirective;
+import com.github.javaparser.ast.nodeTypes.NodeWithName;
+import com.github.javaparser.ast.nodeTypes.NodeWithTraversableScope;
+import com.github.javaparser.ast.nodeTypes.NodeWithTypeArguments;
+import com.github.javaparser.ast.nodeTypes.NodeWithVariables;
+import com.github.javaparser.ast.nodeTypes.SwitchNode;
+import com.github.javaparser.ast.stmt.AssertStmt;
+import com.github.javaparser.ast.stmt.BlockStmt;
+import com.github.javaparser.ast.stmt.BreakStmt;
+import com.github.javaparser.ast.stmt.CatchClause;
+import com.github.javaparser.ast.stmt.ContinueStmt;
+import com.github.javaparser.ast.stmt.DoStmt;
+import com.github.javaparser.ast.stmt.EmptyStmt;
+import com.github.javaparser.ast.stmt.ExplicitConstructorInvocationStmt;
+import com.github.javaparser.ast.stmt.ExpressionStmt;
+import com.github.javaparser.ast.stmt.ForEachStmt;
+import com.github.javaparser.ast.stmt.ForStmt;
+import com.github.javaparser.ast.stmt.IfStmt;
+import com.github.javaparser.ast.stmt.LabeledStmt;
+import com.github.javaparser.ast.stmt.LocalClassDeclarationStmt;
+import com.github.javaparser.ast.stmt.LocalRecordDeclarationStmt;
+import com.github.javaparser.ast.stmt.ReturnStmt;
+import com.github.javaparser.ast.stmt.Statement;
+import com.github.javaparser.ast.stmt.SwitchEntry;
+import com.github.javaparser.ast.stmt.SwitchStmt;
+import com.github.javaparser.ast.stmt.SynchronizedStmt;
+import com.github.javaparser.ast.stmt.ThrowStmt;
+import com.github.javaparser.ast.stmt.TryStmt;
+import com.github.javaparser.ast.stmt.UnparsableStmt;
+import com.github.javaparser.ast.stmt.WhileStmt;
+import com.github.javaparser.ast.stmt.YieldStmt;
+import com.github.javaparser.ast.type.ArrayType;
+import com.github.javaparser.ast.type.ClassOrInterfaceType;
+import com.github.javaparser.ast.type.IntersectionType;
+import com.github.javaparser.ast.type.PrimitiveType;
+import com.github.javaparser.ast.type.ReferenceType;
+import com.github.javaparser.ast.type.Type;
+import com.github.javaparser.ast.type.TypeParameter;
+import com.github.javaparser.ast.type.UnionType;
+import com.github.javaparser.ast.type.UnknownType;
+import com.github.javaparser.ast.type.VarType;
+import com.github.javaparser.ast.type.VoidType;
+import com.github.javaparser.ast.type.WildcardType;
+import com.github.javaparser.ast.visitor.Visitable;
+import com.github.javaparser.ast.visitor.VoidVisitor;
+import com.github.javaparser.printer.PrettyPrintVisitor;
+import com.github.javaparser.printer.SourcePrinter;
+import com.github.javaparser.printer.configuration.Indentation.IndentType;
+import com.github.javaparser.printer.configuration.PrettyPrinterConfiguration;
+import com.github.javaparser.utils.Utils;
+
+import matcher.type.FieldInstance;
+import matcher.type.MethodInstance;
 
 public class HtmlPrinter implements VoidVisitor<Void> {
 	public HtmlPrinter(TypeResolver typeResolver) {
@@ -46,10 +178,10 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 		return printer.getSource();
 	}
 
-	private void printModifiers(final EnumSet<Modifier> modifiers) {
+	private void printModifiers(final NodeList<Modifier> modifiers) {
 		for (Modifier m : modifiers) {
 			printer.print("<span class=\"keyword\">");
-			printer.print(m.asString());
+			printer.print(m.getKeyword().asString());
 			printer.print("</span> ");
 		}
 	}
@@ -60,9 +192,9 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 				.comparingInt(HtmlPrinter::getTypeIdx)
 				.thenComparing((a, b) -> {
 					// move instance methods after constructors
-					if (a.isConstructorDeclaration() && b.isMethodDeclaration() && !((MethodDeclaration) b).getModifiers().contains(Modifier.STATIC)) {
+					if (a.isConstructorDeclaration() && b.isMethodDeclaration() && !((MethodDeclaration) b).hasModifier(Keyword.STATIC)) {
 						return -1;
-					} else if (b.isConstructorDeclaration() && a.isMethodDeclaration() && !((MethodDeclaration) a).getModifiers().contains(Modifier.STATIC)) {
+					} else if (b.isConstructorDeclaration() && a.isMethodDeclaration() && !((MethodDeclaration) a).hasModifier(Keyword.STATIC)) {
 						return 1;
 					} else {
 						return 0;
@@ -75,7 +207,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 			if (prev != null &&
 					(!prev.isFieldDeclaration()
 							|| !member.isFieldDeclaration()
-							|| ((FieldDeclaration) prev).getModifiers().contains(Modifier.STATIC) && !((FieldDeclaration) member).getModifiers().contains(Modifier.STATIC))) {
+							|| ((FieldDeclaration) prev).hasModifier(Keyword.STATIC) && !((FieldDeclaration) member).hasModifier(Keyword.STATIC))) {
 				printer.println();
 			}
 
@@ -87,17 +219,17 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 	}
 
 	private static int getTypeIdx(BodyDeclaration<?> decl) {
-		// order: enum-cst static-init/static-field inst-init/inst-field mth/ctor/annotation inst-type static-type
+		// order: enum-cst mth/ctor/annotation static-init/static-field inst-init/inst-field inst-type static-type
 		// note: static-init <-> fields and inst-init <-> inst-field can't be reordered with each other as their order determines execution order
 
 		if (decl.isEnumConstantDeclaration()) {
 			return 0;
-		} else if (decl.isAnnotationMemberDeclaration() || decl.isCallableDeclaration()) {
-			return 3;
+		} else if (decl.isAnnotationMemberDeclaration() || decl.isCallableDeclaration() || decl.isCompactConstructorDeclaration()) {
+			return 1;
 		} else if (decl.isFieldDeclaration()) {
-			return ((FieldDeclaration) decl).getModifiers().contains(Modifier.STATIC) ? 1 : 2;
+			return ((FieldDeclaration) decl).hasModifier(Keyword.STATIC) ? 2 : 3;
 		} else if (decl.isInitializerDeclaration()) {
-			return ((InitializerDeclaration) decl).isStatic() ? 1 : 2;
+			return ((InitializerDeclaration) decl).isStatic() ? 2 : 3;
 		} else if (decl.isTypeDeclaration()) {
 			if (decl.isClassOrInterfaceDeclaration() && ((ClassOrInterfaceDeclaration) decl).isInterface() || ((TypeDeclaration<?>) decl).isStatic()) {
 				return 5;
@@ -222,6 +354,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final CompilationUnit n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		if (n.getParsed() == UNPARSABLE) {
 			printer.println("???");
@@ -252,6 +385,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final PackageDeclaration n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printMemberAnnotations(n.getAnnotations(), arg);
 		printer.print("<span class=\"keyword\">package</span> ");
@@ -264,6 +398,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final NameExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		n.getName().accept(this, arg);
 
@@ -272,12 +407,12 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final Name n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		if (n.getQualifier().isPresent()) {
 			n.getQualifier().get().accept(this, arg);
 			printer.print(".");
 		}
-		printAnnotations(n.getAnnotations(), false, arg);
 		printer.print(n.getIdentifier());
 
 		printOrphanCommentsEnding(n);
@@ -290,6 +425,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final ClassOrInterfaceDeclaration n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printMemberAnnotations(n.getAnnotations(), arg);
 		printModifiers(n.getModifiers());
@@ -339,9 +475,58 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 	}
 
 	@Override
+	public void visit(RecordDeclaration n, Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
+		printComment(n.getComment(), arg);
+		printMemberAnnotations(n.getAnnotations(), arg);
+		printModifiers(n.getModifiers());
+
+		printer.print("<span class=\"keyword\">record</span> ");
+
+		n.getName().accept(this, arg);
+
+		printer.print("(");
+		if (!isNullOrEmpty(n.getParameters())) {
+			for (final Iterator<Parameter> i = n.getParameters().iterator(); i.hasNext(); ) {
+				final Parameter p = i.next();
+				p.accept(this, arg);
+				if (i.hasNext()) {
+					printer.print(", ");
+				}
+			}
+		}
+		printer.print(")");
+
+		printTypeParameters(n.getTypeParameters(), arg);
+
+		if (!n.getImplementedTypes().isEmpty()) {
+			printer.print(" <span class=\"keyword\">implements</span> ");
+			for (final Iterator<ClassOrInterfaceType> i = n.getImplementedTypes().iterator(); i.hasNext(); ) {
+				final ClassOrInterfaceType c = i.next();
+				c.accept(this, arg);
+				if (i.hasNext()) {
+					printer.print(", ");
+				}
+			}
+		}
+
+		printer.println(" {");
+		printer.indent();
+		if (!isNullOrEmpty(n.getMembers())) {
+			printMembers(n.getMembers(), arg);
+		}
+
+		printOrphanCommentsEnding(n);
+
+		printer.unindent();
+		printer.print("}");
+	}
+
+	@Override
 	public void visit(final JavadocComment n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		if (configuration.isPrintComments() && configuration.isPrintJavadoc()) {
-			printer.println("<span class=\"javadoc\">/**");
+			printer.println("<span class=\"comment\">/**");
 			final String commentContent = Utils.normalizeEolInTextBlock(HtmlUtil.escape(n.getContent()), configuration.getEndOfLineCharacter());
 			String[] lines = commentContent.split("\\R");
 			boolean skippingLeadingEmptyLines = true;
@@ -376,6 +561,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final ClassOrInterfaceType n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		if (n.getScope().isPresent()) {
 			n.getScope().get().accept(this, arg);
@@ -394,6 +580,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final TypeParameter n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printAnnotations(n.getAnnotations(), false, arg);
 		n.getName().accept(this, arg);
@@ -411,6 +598,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final PrimitiveType n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printAnnotations(n.getAnnotations(), true, arg);
 		printer.print("<span class=\"keyword\">");
@@ -447,6 +635,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final IntersectionType n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printAnnotations(n.getAnnotations(), false, arg);
 		boolean isFirst = true;
@@ -462,6 +651,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final UnionType n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printAnnotations(n.getAnnotations(), true, arg);
 		boolean isFirst = true;
@@ -477,6 +667,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final WildcardType n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printAnnotations(n.getAnnotations(), false, arg);
 		printer.print("?");
@@ -537,11 +728,9 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 		FieldInstance field = typeResolver.getField(var);
 
 		if (field != null) {
-			printer.unindent();
 			printer.print("<span id=\"");
 			printer.print(HtmlUtil.getId(field));
-			printer.print("\">\t");
-			printer.indent();
+			printer.print("\">");
 
 			return true;
 		} else {
@@ -551,6 +740,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final VariableDeclarator n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 
 		boolean isField = n.getParentNode().orElse(null) instanceof FieldDeclaration;
@@ -563,24 +753,22 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 		printer.print("</span>");
 
-		n.findAncestor(NodeWithVariables.class).ifPresent(ancestor -> {
-			((NodeWithVariables<?>) ancestor).getMaximumCommonType().ifPresent(commonType -> {
+		n.findAncestor(NodeWithVariables.class).ifPresent(ancestor -> ((NodeWithVariables<?>) ancestor).getMaximumCommonType().ifPresent(commonType -> {
 
-				final Type type = n.getType();
+			final Type type = n.getType();
 
-				ArrayType arrayType = null;
+			ArrayType arrayType = null;
 
-				for (int i = commonType.getArrayLevel(); i < type.getArrayLevel(); i++) {
-					if (arrayType == null) {
-						arrayType = (ArrayType) type;
-					} else {
-						arrayType = (ArrayType) arrayType.getComponentType();
-					}
-					printAnnotations(arrayType.getAnnotations(), true, arg);
-					printer.print("[]");
+			for (int i = commonType.getArrayLevel(); i < type.getArrayLevel(); i++) {
+				if (arrayType == null) {
+					arrayType = (ArrayType) type;
+				} else {
+					arrayType = (ArrayType) arrayType.getComponentType();
 				}
-			});
-		});
+				printAnnotations(arrayType.getAnnotations(), true, arg);
+				printer.print("[]");
+			}
+		}));
 
 		if (n.getInitializer().isPresent()) {
 			printer.print(" = ");
@@ -590,6 +778,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final ArrayInitializerExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printer.print("{");
 		if (!isNullOrEmpty(n.getValues())) {
@@ -609,6 +798,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final VoidType n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printAnnotations(n.getAnnotations(), false, arg);
 		printer.print("<span class=\"keyword\">void</span>");
@@ -616,13 +806,22 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final VarType n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printAnnotations(n.getAnnotations(), false, arg);
 		printer.print("<span class=\"keyword\">var</span>");
 	}
 
 	@Override
+	public void visit(Modifier n, Void arg) {
+		printer.print("<span class=\"keyword\">");
+		printer.print(n.getKeyword().asString());
+		printer.print("</span> ");
+	}
+
+	@Override
 	public void visit(final ArrayAccessExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		n.getName().accept(this, arg);
 		printer.print("[");
@@ -632,6 +831,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final ArrayCreationExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printer.print("<span class=\"keyword\">new</span> ");
 		n.getElementType().accept(this, arg);
@@ -646,6 +846,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final AssignExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		n.getTarget().accept(this, arg);
 		printer.print(" ");
@@ -656,6 +857,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final BinaryExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		n.getLeft().accept(this, arg);
 		printer.print(" ");
@@ -675,13 +877,15 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final ClassExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		n.getType().accept(this, arg);
-		printer.print("<span class=\"keyword\">.class</span>");
+		printer.print(".class");
 	}
 
 	@Override
 	public void visit(final ConditionalExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		n.getCondition().accept(this, arg);
 		printer.print(" ? ");
@@ -692,6 +896,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final EnclosedExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printer.print("(");
 		n.getInner().accept(this, arg);
@@ -700,29 +905,36 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final FieldAccessExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		n.getScope().accept(this, arg);
 		printer.print(".");
-		printer.print("<span class=\"field");
-		String name = n.getNameAsString();
-		if (name.toUpperCase(Locale.ROOT).equals(name)) {
-			printer.print(" constant");
-		}
-		printer.print("\">");
 		n.getName().accept(this, arg);
-		printer.print("</span>");
 	}
 
 	@Override
 	public void visit(final InstanceOfExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		n.getExpression().accept(this, arg);
 		printer.print(" <span class=\"keyword\">instanceof</span> ");
 		n.getType().accept(this, arg);
+		if(n.getName().isPresent()) {
+			printer.print(" ");
+			n.getName().get().accept(this, arg);
+		}
+	}
+
+	@Override
+	public void visit(final PatternExpr n, final Void arg) {
+		n.getType().accept(this, arg);
+		printer.print(" ");
+		n.getName().accept(this, arg);
 	}
 
 	@Override
 	public void visit(final CharLiteralExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printer.print("<span class=\"string\">'");
 		printer.print(HtmlUtil.escape(n.getValue()));
@@ -731,30 +943,28 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final DoubleLiteralExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
-		printer.print("<span class=\"number\">");
 		printer.print(n.getValue());
-		printer.print("</span>");
 	}
 
 	@Override
 	public void visit(final IntegerLiteralExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
-		printer.print("<span class=\"number\">");
 		printer.print(n.getValue());
-		printer.print("</span>");
 	}
 
 	@Override
 	public void visit(final LongLiteralExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
-		printer.print("<span class=\"number\">");
 		printer.print(n.getValue());
-		printer.print("</span>");
 	}
 
 	@Override
 	public void visit(final StringLiteralExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printer.print("<span class=\"string\">\"");
 		printer.print(HtmlUtil.escape(n.getValue()));
@@ -762,7 +972,22 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 	}
 
 	@Override
+	public void visit(final TextBlockLiteralExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
+		printComment(n.getComment(), arg);
+		printer.print("<span class=\"string\">\"\"\"");
+		printer.indent();
+		n.stripIndentOfLines().forEach(line -> {
+			printer.println();
+			printer.print(HtmlUtil.escape(line));
+		});
+		printer.print("\"\"\"</span>");
+		printer.unindent();
+	}
+
+	@Override
 	public void visit(final BooleanLiteralExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 
 		printer.print("<span class=\"keyword\">");
@@ -772,15 +997,17 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final NullLiteralExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printer.print("<span class=\"keyword\">null</span>");
 	}
 
 	@Override
 	public void visit(final ThisExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
-		if (n.getClassExpr().isPresent()) {
-			n.getClassExpr().get().accept(this, arg);
+		if (n.getTypeName().isPresent()) {
+			n.getTypeName().get().accept(this, arg);
 			printer.print(".");
 		}
 		printer.print("<span class=\"keyword\">this</span>");
@@ -788,9 +1015,10 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final SuperExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
-		if (n.getClassExpr().isPresent()) {
-			n.getClassExpr().get().accept(this, arg);
+		if (n.getTypeName().isPresent()) {
+			n.getTypeName().get().accept(this, arg);
 			printer.print(".");
 		}
 		printer.print("<span class=\"keyword\">super</span>");
@@ -798,6 +1026,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final MethodCallExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 
 		// determine whether we do reindenting for aligmnent at all
@@ -901,8 +1130,9 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final ObjectCreationExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
-		if (n.getScope().isPresent()) {
+		if (n.hasScope()) {
 			n.getScope().get().accept(this, arg);
 			printer.print(".");
 		}
@@ -929,6 +1159,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final UnaryExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		if (n.getOperator().isPrefix()) {
 			printer.print(n.getOperator().asString());
@@ -943,14 +1174,13 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final ConstructorDeclaration n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		MethodInstance method = typeResolver.getMethod(n);
 
 		if (method != null) {
-			printer.unindent();
 			printer.print("<span id=\"");
 			printer.print(HtmlUtil.getId(method));
-			printer.print("\">\t");
-			printer.indent();
+			printer.print("\">");
 		}
 
 		printComment(n.getComment(), arg);
@@ -961,10 +1191,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 		if (n.isGeneric()) {
 			printer.print(" ");
 		}
-
-		printer.print("<span class=\"constructor method name\">");
-		printer.print(HtmlUtil.escape(n.getName().getIdentifier()));
-		printer.print("</span>");
+		n.getName().accept(this, arg);
 
 		printer.print("(");
 		if (!n.getParameters().isEmpty()) {
@@ -997,15 +1224,42 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 	}
 
 	@Override
+	public void visit(final CompactConstructorDeclaration n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
+		printComment(n.getComment(), arg);
+		printMemberAnnotations(n.getAnnotations(), arg);
+		printModifiers(n.getModifiers());
+
+		printTypeParameters(n.getTypeParameters(), arg);
+		if (n.isGeneric()) {
+			printer.print(" ");
+		}
+		n.getName().accept(this, arg);
+
+		if (!isNullOrEmpty(n.getThrownExceptions())) {
+			printer.print(" <span class=\"keyword\">throws</span> ");
+			for (final Iterator<ReferenceType> i = n.getThrownExceptions().iterator(); i.hasNext(); ) {
+				final ReferenceType name = i.next();
+				printer.print("<span class=\"variable\">");
+				name.accept(this, arg);
+				printer.print("</span>");
+				if (i.hasNext()) {
+					printer.print(", ");
+				}
+			}
+		}
+		printer.print(" ");
+		n.getBody().accept(this, arg);
+	}
+
+	@Override
 	public void visit(final MethodDeclaration n, final Void arg) {
 		MethodInstance method = typeResolver.getMethod(n);
 
 		if (method != null) {
-			printer.unindent();
 			printer.print("<span id=\"");
 			printer.print(HtmlUtil.getId(method));
-			printer.print("\">\t");
-			printer.indent();
+			printer.print("\">");
 		}
 
 		printOrphanCommentsBeforeThisChildNode(n);
@@ -1019,9 +1273,8 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 		}
 
 		n.getType().accept(this, arg);
-		printer.print(" <span class=\"method name\">");
-		printer.print(HtmlUtil.escape(n.getName().getIdentifier()));
-		printer.print("</span>");
+		printer.print(" ");
+		n.getName().accept(this, arg);
 
 		printer.print("(");
 		n.getReceiverParameter().ifPresent(rp -> {
@@ -1065,6 +1318,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final Parameter n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printAnnotations(n.getAnnotations(), false, arg);
 		printModifiers(n.getModifiers());
@@ -1084,6 +1338,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final ReceiverParameter n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printAnnotations(n.getAnnotations(), false, arg);
 		n.getType().accept(this, arg);
@@ -1093,6 +1348,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final ExplicitConstructorInvocationStmt n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		if (n.isThis()) {
 			printTypeArgs(n, arg);
@@ -1111,6 +1367,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final VariableDeclarationExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		if (n.getParentNode().map(ExpressionStmt.class::isInstance).orElse(false)) {
 			printMemberAnnotations(n.getAnnotations(), arg);
@@ -1135,12 +1392,21 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final LocalClassDeclarationStmt n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		n.getClassDeclaration().accept(this, arg);
 	}
 
 	@Override
+	public void visit(final LocalRecordDeclarationStmt n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
+		printComment(n.getComment(), arg);
+		n.getRecordDeclaration().accept(this, arg);
+	}
+
+	@Override
 	public void visit(final AssertStmt n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printer.print("<span class=\"keyword\">assert</span> ");
 		n.getCheck().accept(this, arg);
@@ -1170,6 +1436,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final LabeledStmt n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		n.getLabel().accept(this, arg);
 		printer.print(": ");
@@ -1178,6 +1445,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final EmptyStmt n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printer.print(";");
 	}
@@ -1192,31 +1460,50 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final SwitchStmt n, final Void arg) {
-		if (canAddNewLine(n)) printer.println();
+		printOrphanCommentsBeforeThisChildNode(n);
+		printSwitchNode(n, arg);
+	}
 
+	@Override
+	public void visit(SwitchExpr n, Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
+		printSwitchNode(n, arg);
+	}
+
+	private void printSwitchNode(SwitchNode n, Void arg) {
+		if (canAddNewLine((Node) n)) printer.println();
 		printComment(n.getComment(), arg);
 		printer.print("<span class=\"keyword\">switch</span> (");
 		n.getSelector().accept(this, arg);
 		printer.println(") {");
 		if (n.getEntries() != null) {
-			for (final SwitchEntryStmt e : n.getEntries()) {
+			for (final SwitchEntry e : n.getEntries()) {
 				e.accept(this, arg);
 			}
 		}
 		printer.print("}");
 
-		if (getNext(n) != null) printer.println();
+		if (getNext((Node) n) != null) printer.println();
 	}
 
 	@Override
-	public void visit(final SwitchEntryStmt n, final Void arg) {
+	public void visit(final SwitchEntry n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
-		if (n.getLabel().isPresent()) {
-			printer.print("<span class=\"keyword\">case</span> ");
-			n.getLabel().get().accept(this, arg);
-			printer.print(":");
+
+		final String separator = (n.getType() == SwitchEntry.Type.STATEMENT_GROUP) ? ":" : " ->"; // old/new switch
+		if (isNullOrEmpty(n.getLabels())) {
+			printer.print("<span class=\"keyword\">default</span>" + separator);
 		} else {
-			printer.print("<span class=\"keyword\">default</span>:");
+			printer.print("<span class=\"keyword\">case</span> ");
+			for (final Iterator<Expression> i = n.getLabels().iterator(); i.hasNext(); ) {
+				final Expression label = i.next();
+				label.accept(this, arg);
+				if (i.hasNext()) {
+					printer.print(", ");
+				}
+			}
+			printer.print(separator);
 		}
 
 		if (n.getStatements() != null
@@ -1243,6 +1530,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final BreakStmt n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printer.print("<span class=\"keyword\">break</span>");
 		n.getLabel().ifPresent(l -> printer.print(" ").print(l.getIdentifier()));
@@ -1250,7 +1538,17 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 	}
 
 	@Override
+	public void visit(final YieldStmt n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
+		printComment(n.getComment(), arg);
+		printer.print("<span class=\"keyword\">yield</span> ");
+		n.getExpression().accept(this, arg);
+		printer.print(";");
+	}
+
+	@Override
 	public void visit(final ReturnStmt n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printer.print("<span class=\"keyword\">return</span>");
 		if (n.getExpression().isPresent()) {
@@ -1262,6 +1560,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final EnumDeclaration n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printMemberAnnotations(n.getAnnotations(), arg);
 		printModifiers(n.getModifiers());
@@ -1315,21 +1614,18 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final EnumConstantDeclaration n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		FieldInstance field = typeResolver.getField(n);
 
 		if (field != null) {
-			printer.unindent();
 			printer.print("<span id=\"");
 			printer.print(HtmlUtil.getId(field));
-			printer.print("\">\t");
-			printer.indent();
+			printer.print("\">");
 		}
 
 		printComment(n.getComment(), arg);
 		printMemberAnnotations(n.getAnnotations(), arg);
-		printer.print("<span class=\"enum name\">");
-		printer.print(HtmlUtil.escape(n.getName().getIdentifier()));
-		printer.print("</span>");
+		n.getName().accept(this, arg);
 
 		if (!n.getArguments().isEmpty()) {
 			printArguments(n.getArguments(), arg);
@@ -1348,6 +1644,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final InitializerDeclaration n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		if (n.isStatic()) {
 			printer.print("<span class=\"keyword\">static</span> ");
@@ -1357,6 +1654,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final IfStmt n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		boolean thenBlock = n.getThenStmt() instanceof BlockStmt;
 
 		while (thenBlock
@@ -1415,6 +1713,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final WhileStmt n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		if (canAddNewLine(n)) printer.println();
 
 		printComment(n.getComment(), arg);
@@ -1428,6 +1727,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final ContinueStmt n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printer.print("<span class=\"keyword\">continue</span>");
 		n.getLabel().ifPresent(l -> printer.print(" ").print(l.getIdentifier()));
@@ -1436,6 +1736,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final DoStmt n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		if (canAddNewLine(n)) printer.println();
 
 		printComment(n.getComment(), arg);
@@ -1450,6 +1751,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final ForEachStmt n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		if (canAddNewLine(n)) printer.println();
 
 		printComment(n.getComment(), arg);
@@ -1465,6 +1767,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final ForStmt n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		if (canAddNewLine(n)) printer.println();
 
 		printComment(n.getComment(), arg);
@@ -1500,6 +1803,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final ThrowStmt n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printer.print("<span class=\"keyword\">throw</span> ");
 		n.getExpression().accept(this, arg);
@@ -1508,6 +1812,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final SynchronizedStmt n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printer.print("<span class=\"keyword\">synchronized</span> (");
 		n.getExpression().accept(this, arg);
@@ -1517,6 +1822,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final TryStmt n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		if (canAddNewLine(n)) printer.println();
 
 		printComment(n.getComment(), arg);
@@ -1555,6 +1861,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final CatchClause n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printer.print(" <span class=\"keyword\">catch</span> (");
 		n.getParameter().accept(this, arg);
@@ -1564,6 +1871,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final AnnotationDeclaration n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printMemberAnnotations(n.getAnnotations(), arg);
 		printModifiers(n.getModifiers());
@@ -1581,6 +1889,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final AnnotationMemberDeclaration n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printMemberAnnotations(n.getAnnotations(), arg);
 		printModifiers(n.getModifiers());
@@ -1598,6 +1907,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final MarkerAnnotationExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printer.print("<span class=\"annotation\">@");
 		n.getName().accept(this, arg);
@@ -1606,6 +1916,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final SingleMemberAnnotationExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printer.print("<span class=\"annotation\">@");
 		n.getName().accept(this, arg);
@@ -1616,6 +1927,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final NormalAnnotationExpr n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printer.print("<span class=\"annotation\">@");
 		n.getName().accept(this, arg);
@@ -1634,6 +1946,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final MemberValuePair n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		n.getName().accept(this, arg);
 		printer.print(" = ");
@@ -1670,6 +1983,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(LambdaExpr n, Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 
 		final NodeList<Parameter> parameters = n.getParameters();
@@ -1701,6 +2015,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(MethodReferenceExpr n, Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		Expression scope = n.getScope();
 		String identifier = n.getIdentifier();
@@ -1717,6 +2032,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(TypeExpr n, Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		if (n.getType() != null) {
 			n.getType().accept(this, arg);
@@ -1744,6 +2060,7 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 	@Override
 	public void visit(final ImportDeclaration n, final Void arg) {
+		printOrphanCommentsBeforeThisChildNode(n);
 		printComment(n.getComment(), arg);
 		printer.print("<span class=\"keyword\">import</span> ");
 		if (n.isStatic()) {
@@ -1823,12 +2140,14 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 
 		Node parent = node.getParentNode().orElse(null);
 		if (parent == null) return;
-		List<Node> everything = new LinkedList<>();
-		everything.addAll(parent.getChildNodes());
+		List<Node> everything = new ArrayList<>(parent.getChildNodes());
 		sortByBeginPosition(everything);
 		int positionOfTheChild = -1;
-		for (int i = 0; i < everything.size(); i++) {
-			if (everything.get(i) == node) positionOfTheChild = i;
+		for (int i = 0; i < everything.size(); ++i) { // indexOf is by equality, so this is used to index by identity
+			if (everything.get(i) == node) {
+				positionOfTheChild = i;
+				break;
+			}
 		}
 		if (positionOfTheChild == -1) {
 			throw new AssertionError("I am not a child of my parent.");
@@ -1850,8 +2169,8 @@ public class HtmlPrinter implements VoidVisitor<Void> {
 	private void printOrphanCommentsEnding(final Node node) {
 		if (configuration.isIgnoreComments()) return;
 
-		List<Node> everything = new LinkedList<>();
-		everything.addAll(node.getChildNodes());
+		// extract all nodes for which the position/range is indicated to avoid to skip orphan comments
+		List<Node> everything = node.getChildNodes().stream().filter(n->n.getRange().isPresent()).collect(Collectors.toList());
 		sortByBeginPosition(everything);
 		if (everything.isEmpty()) {
 			return;

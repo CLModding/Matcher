@@ -10,6 +10,10 @@ plugins {
 repositories {
 	mavenCentral()
 	maven {
+		name "FabricMc"
+		url "https://maven.fabricmc.net/"
+	}
+	maven {
 		name "Quilt"
 		url 'https://maven.quiltmc.org/repository/release/'
 	}
@@ -48,7 +52,7 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 dependencies {
-    implementation "com.github.javaparser:javaparser-core:3.8.3"
+    implementation "com.github.javaparser:javaparser-core:3.24.2"
 	implementation "org.quiltmc:procyon-quilt-compilertools:0.5.35.local"
 	api "org.ow2.asm:asm:9.1"
 	implementation "org.ow2.asm:asm-commons:9.1"
@@ -56,6 +60,7 @@ dependencies {
 	implementation "org.ow2.asm:asm-util:9.1"
 	implementation "org.quiltmc:cfr:0.0.6"
 	implementation "org.quiltmc:quiltflower:1.7.0"
+	implementation "net.fabricmc:mapping-io:0.3.0"
 }
 
 // TODO: Add Automatic-Module-Name to all these in Quilt forks

@@ -45,7 +45,7 @@ public class Matcher {
 
 	private void matchUnobfuscated() {
 		for (ClassInstance cls : env.getClassesA()) {
-			if (cls.isNameObfuscated()) continue;
+			if (cls.isNameObfuscated() || !cls.isReal()) continue;
 
 			ClassInstance match = env.getLocalClsByIdB(cls.getId());
 
@@ -256,10 +256,6 @@ public class Matcher {
 	}
 
 	public void match(MethodInstance a, MethodInstance b) {
-		match(a, b, true);
-	}
-
-	private void match(MethodInstance a, MethodInstance b, boolean matchHierarchyMembers) {
 		if (a == null) throw new NullPointerException("null method A");
 		if (b == null) throw new NullPointerException("null method B");
 		if (a.getCls().getMatch() != b.getCls()) throw new IllegalArgumentException("the methods don't belong to the same class");
@@ -267,58 +263,62 @@ public class Matcher {
 
 		System.out.println("match method "+a+" -> "+b+(a.hasMappedName() ? " ("+a.getName(NameType.MAPPED_PLAIN)+")" : ""));
 
-		if (a.getMatch() != null) {
-			if (matchHierarchyMembers) {
-				for (MethodInstance m : a.getAllHierarchyMembers()) {
+		Set<MethodInstance> membersA = a.getAllHierarchyMembers();
+		Set<MethodInstance> membersB = b.getAllHierarchyMembers();
+		assert membersA.contains(a);
+		assert membersB.contains(b);
+
+		if (!a.hasMatchedHierarchy(b)) {
+			if (a.hasHierarchyMatch()) {
+				for (MethodInstance m : membersA) {
 					if (m.hasMatch()) {
 						unmatchArgsVars(m);
 						m.getMatch().setMatch(null);
+						m.setMatch(null);
 					}
 				}
-			} else {
-				unmatchArgsVars(a);
-				a.getMatch().setMatch(null);
 			}
-		}
 
-		if (b.getMatch() != null) {
-			if (matchHierarchyMembers) {
-				for (MethodInstance m : b.getAllHierarchyMembers()) {
+			if (b.hasHierarchyMatch()) {
+				for (MethodInstance m : membersB) {
 					if (m.hasMatch()) {
 						unmatchArgsVars(m);
 						m.getMatch().setMatch(null);
+						m.setMatch(null);
 					}
 				}
-			} else {
-				unmatchArgsVars(b);
-				b.getMatch().setMatch(null);
 			}
-		}
-
-		a.setMatch(b);
-		b.setMatch(a);
-
-		if (matchHierarchyMembers) {
-			// match parent/child methods
-
-			Set<MethodInstance> srcHierarchyMembers = a.getAllHierarchyMembers();
-			if (srcHierarchyMembers.size() <= 1) return;
 
 			ClassEnv reqEnv = a.getCls().getEnv();
-			Set<MethodInstance> dstHierarchyMembers = null;
 
-			for (MethodInstance src : srcHierarchyMembers) {
-				if (src.hasMatch() || !src.getCls().hasMatch() || src.getCls().getEnv() != reqEnv) continue;
+			for (MethodInstance ca : membersA) {
+				ClassInstance cls = ca.getCls();
+				if (!cls.hasMatch() || cls.getEnv() != reqEnv) continue;
 
-				if (dstHierarchyMembers == null) dstHierarchyMembers = b.getAllHierarchyMembers();
-
-				for (MethodInstance dst : src.getCls().getMatch().getMethods()) {
-					if (dstHierarchyMembers.contains(dst)) {
-						match(src, dst, false);
+				for (MethodInstance cb : cls.getMatch().getMethods()) {
+					if (membersB.contains(cb)) {
+						assert !ca.hasMatch() && !cb.hasMatch();
+						ca.setMatch(cb);
+						cb.setMatch(ca);
 						break;
 					}
 				}
 			}
+		} else {
+			if (a.getMatch() != null) {
+				unmatchArgsVars(a);
+				a.getMatch().setMatch(null);
+				a.setMatch(null);
+			}
+
+			if (b.getMatch() != null) {
+				unmatchArgsVars(b);
+				b.getMatch().setMatch(null);
+				b.setMatch(null);
+			}
+
+			a.setMatch(b);
+			b.setMatch(a);
 		}
 
 		env.getCache().clear();
@@ -462,7 +462,7 @@ public class Matcher {
 
 	public boolean autoMatchClasses(ClassifierLevel level, double absThreshold, double relThreshold, DoubleConsumer progressReceiver) {
 		boolean assumeBothOrNoneObfuscated = env.assumeBothOrNoneObfuscated;
-		Predicate<ClassInstance> filter = cls -> cls.getUri() != null && (!assumeBothOrNoneObfuscated || cls.isNameObfuscated()) && !cls.hasMatch() && cls.isMatchable();
+		Predicate<ClassInstance> filter = cls -> cls.isReal() && (!assumeBothOrNoneObfuscated || cls.isNameObfuscated()) && !cls.hasMatch() && cls.isMatchable();
 
 		List<ClassInstance> classes = env.getClassesA().stream()
 				.filter(filter)
@@ -568,7 +568,7 @@ public class Matcher {
 			Function<ClassInstance, T[]> memberGetter, IRanker<T> ranker, double maxScore,
 			DoubleConsumer progressReceiver, AtomicInteger totalUnmatched) {
 		List<ClassInstance> classes = env.getClassesA().stream()
-				.filter(cls -> cls.getUri() != null && cls.hasMatch() && memberGetter.apply(cls).length > 0)
+				.filter(cls -> cls.isReal() && cls.hasMatch() && memberGetter.apply(cls).length > 0)
 				.filter(cls -> {
 					for (T member : memberGetter.apply(cls)) {
 						if (!member.hasMatch() && member.isMatchable()) return true;
@@ -626,7 +626,7 @@ public class Matcher {
 	private boolean autoMatchMethodVars(boolean isArg, Function<MethodInstance, MethodVarInstance[]> supplier,
 			ClassifierLevel level, double absThreshold, double relThreshold, DoubleConsumer progressReceiver) {
 		List<MethodInstance> methods = env.getClassesA().stream()
-				.filter(cls -> cls.getUri() != null && cls.hasMatch() && cls.getMethods().length > 0)
+				.filter(cls -> cls.isReal() && cls.hasMatch() && cls.getMethods().length > 0)
 				.flatMap(cls -> Stream.<MethodInstance>of(cls.getMethods()))
 				.filter(m -> m.hasMatch() && supplier.apply(m).length > 0)
 				.filter(m -> {
@@ -777,85 +777,6 @@ public class Matcher {
 				totalMethodArgCount, matchedMethodArgCount,
 				totalMethodVarCount, matchedMethodVarCount,
 				totalFieldCount, matchedFieldCount);
-	}
-
-	public boolean propagateNames(DoubleConsumer progressReceiver) {
-		int total = env.getClassesB().size();
-		int current = 0;
-		Set<MethodInstance> checked = Util.newIdentityHashSet();
-		int propagatedMethodNames = 0;
-		int propagatedArgNames = 0;
-
-		for (ClassInstance cls : env.getClassesB()) {
-			if (cls.getMethods().length > 0) {
-				for (MethodInstance method : cls.getMethods()) {
-					if (method.getAllHierarchyMembers().size() <= 1) continue;
-					if (checked.contains(method)) continue;
-
-					String name = method.hasMappedName() || !method.isNameObfuscated() ? method.getName(NameType.MAPPED_PLAIN) : null;
-					if (name != null && method.hasAllArgsMapped()) continue;
-
-					checked.addAll(method.getAllHierarchyMembers());
-
-					// collect names from all hierarchy members
-
-					final int argCount = method.getArgs().length;
-					String[] argNames = new String[argCount];
-					int missingArgNames = argCount;
-
-					collectLoop: for (MethodInstance m : method.getAllHierarchyMembers()) {
-						if (name == null && (method.hasMappedName() || !method.isNameObfuscated())) {
-							name = method.getName(NameType.MAPPED_PLAIN);
-
-							if (missingArgNames == 0) break;
-						}
-
-						if (missingArgNames > 0) {
-							assert m.getArgs().length == argCount;
-
-							for (int i = 0; i < argCount; i++) {
-								MethodVarInstance arg;
-
-								if (argNames[i] == null && (arg = m.getArg(i)).hasMappedName()) {
-									argNames[i] = arg.getName(NameType.MAPPED_PLAIN);
-									missingArgNames--;
-
-									if (name != null && missingArgNames == 0) break collectLoop;
-								}
-							}
-						}
-					}
-
-					if (name == null && missingArgNames == argCount) continue; // nothing found
-
-					// apply names to all hierarchy members that don't have any yet
-
-					for (MethodInstance m : method.getAllHierarchyMembers()) {
-						if (name != null && !m.hasMappedName()) {
-							m.setMappedName(name);
-							propagatedMethodNames++;
-						}
-
-						for (int i = 0; i < argCount; i++) {
-							MethodVarInstance arg;
-
-							if (argNames[i] != null && !(arg = m.getArg(i)).hasMappedName()) {
-								arg.setMappedName(argNames[i]);
-								propagatedArgNames++;
-							}
-						}
-					}
-				}
-			}
-
-			if (((++current & (1 << 4) - 1)) == 0) {
-				progressReceiver.accept((double) current / total);
-			}
-		}
-
-		System.out.printf("Propagated %d method names, %d method arg names.", propagatedMethodNames, propagatedArgNames);
-
-		return propagatedMethodNames > 0 || propagatedArgNames > 0;
 	}
 
 	public static class MatchingStatus {

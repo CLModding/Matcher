@@ -31,13 +31,17 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 	private MethodInstance(ClassInstance cls, String origName, String desc, MethodNode asmNode, boolean nameObfuscated, int position, boolean isStatic) {
 		super(cls, getId(origName, desc), origName, nameObfuscated, position, isStatic);
 
-		this.real = asmNode != null;
-		this.access = asmNode != null ? asmNode.access : approximateAccess(isStatic);
-		this.args = gatherArgs(this, desc, asmNode);
-		this.vars = cls.isInput() ? gatherVars(this, asmNode) : emptyVars;
-		this.retType = cls.getEnv().getCreateClassInstance(Type.getReturnType(desc).getDescriptor());
-		this.signature = asmNode == null || asmNode.signature == null || !cls.isInput() ? null : MethodSignature.parse(asmNode.signature, cls.getEnv());
-		this.asmNode = !cls.getEnv().isShared() ? asmNode : null;
+		try {
+			this.real = asmNode != null;
+			this.access = asmNode != null ? asmNode.access : approximateAccess(isStatic);
+			this.args = gatherArgs(this, desc, asmNode);
+			this.vars = cls.isInput() ? gatherVars(this, asmNode) : emptyVars;
+			this.retType = cls.getEnv().getCreateClassInstance(Type.getReturnType(desc).getDescriptor());
+			this.signature = asmNode == null || asmNode.signature == null || !cls.isInput() ? null : MethodSignature.parse(asmNode.signature, cls.getEnv());
+			this.asmNode = !cls.getEnv().isShared() ? asmNode : null;
+		} catch (InvalidSharedEnvQueryException e) {
+			throw e.checkOrigin(cls);
+		}
 
 		classRefs.add(retType);
 		retType.methodTypeRefs.add(this);
@@ -199,15 +203,44 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 
 	@Override
 	public String getDesc() {
-		String ret = "(";
+		return getDesc(NameType.PLAIN);
+	}
+
+	@Override
+	public String getDesc(NameType type) {
+		int descStart = id.indexOf('(');
+		if (type == NameType.PLAIN || id.indexOf('L', descStart + 1) < 0) return id.substring(descStart);
+
+		StringBuilder ret = new StringBuilder(id.length());
+		ret.append('(');
 
 		for (MethodVarInstance arg : args) {
-			ret += arg.getType().id;
+			if (!appendId(arg.getType(), type, ret)) return null;
 		}
 
-		ret += ")" + retType.getId();
+		ret.append(')');
+		if (!appendId(retType, type, ret)) return null;
 
-		return ret;
+		return ret.toString();
+	}
+
+	private static boolean appendId(ClassInstance cls, NameType type, StringBuilder out) {
+		if (type == NameType.PLAIN || cls.isPrimitive()) {
+			out.append(cls.id);
+		} else {
+			String name = cls.getName(type);
+			if (name == null) return false;
+
+			if (cls.isArray()) {
+				out.append(name);
+			} else {
+				out.append('L');
+				out.append(name);
+				out.append(';');
+			}
+		}
+
+		return true;
 	}
 
 	@Override
@@ -314,6 +347,30 @@ public final class MethodInstance extends MemberInstance<MethodInstance> {
 
 	public MethodSignature getSignature() {
 		return signature;
+	}
+
+	@Override
+	public boolean canBeRecordComponent() {
+		return cls.isRecord() && !isStatic() && isPublic() && args.length == 0 && !retType.id.equals("V");
+	}
+
+	@Override
+	public FieldInstance getLinkedRecordComponent(NameType nameType) {
+		if (!canBeRecordComponent()) return null;
+
+		String name = nameType != null ? getName(nameType) : null;
+		FieldInstance ret = null;
+
+		for (FieldInstance field : cls.getFields()) {
+			if (field.canBeRecordComponent()
+					&& field.getType().equals(retType)
+					&& (name == null || name.equals(field.getName(nameType)))
+					&& (ret == null || !fieldReadRefs.contains(ret) && fieldReadRefs.contains(field))) {
+				ret = field;
+			}
+		}
+
+		return ret;
 	}
 
 	public boolean isBridge() {

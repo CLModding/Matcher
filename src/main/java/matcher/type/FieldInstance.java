@@ -29,9 +29,13 @@ public final class FieldInstance extends MemberInstance<FieldInstance> {
 	private FieldInstance(ClassInstance cls, String origName, String desc, FieldNode asmNode, boolean nameObfuscated, int position, boolean isStatic) {
 		super(cls, getId(origName, desc), origName, nameObfuscated, position, isStatic);
 
-		this.type = cls.getEnv().getCreateClassInstance(desc);
-		this.asmNode = asmNode;
-		this.signature = asmNode == null || asmNode.signature == null || !cls.isInput() ? null : FieldSignature.parse(asmNode.signature, cls.getEnv());
+		try {
+			this.type = cls.getEnv().getCreateClassInstance(desc);
+			this.asmNode = asmNode;
+			this.signature = asmNode == null || asmNode.signature == null || !cls.isInput() ? null : FieldSignature.parse(asmNode.signature, cls.getEnv());
+		} catch (InvalidSharedEnvQueryException e) {
+			throw e.checkOrigin(cls);
+		}
 
 		type.fieldTypeRefs.add(this);
 	}
@@ -55,6 +59,17 @@ public final class FieldInstance extends MemberInstance<FieldInstance> {
 	@Override
 	public String getDesc() {
 		return type.id;
+	}
+
+	@Override
+	public String getDesc(NameType type) {
+		if (type == NameType.PLAIN || this.type.isPrimitive()) {
+			return this.type.id;
+		} else {
+			String typeName = this.type.getName(type);
+
+			return typeName != null ? ClassInstance.getId(typeName) : null;
+		}
 	}
 
 	@Override
@@ -98,6 +113,30 @@ public final class FieldInstance extends MemberInstance<FieldInstance> {
 
 	public Set<MethodInstance> getWriteRefs() {
 		return writeRefs;
+	}
+
+	@Override
+	public boolean canBeRecordComponent() {
+		return cls.isRecord() && !isStatic() && !isProtected() && !isPublic() && isFinal(); // jls requires private, but proguard(?) uses package-private too
+	}
+
+	@Override
+	public MethodInstance getLinkedRecordComponent(NameType nameType) {
+		if (!canBeRecordComponent()) return null;
+
+		String name = nameType != null ? getName(nameType) : null;
+		MethodInstance ret = null;
+
+		for (MethodInstance method : cls.getMethods()) {
+			if (method.canBeRecordComponent()
+					&& method.getRetType().equals(type)
+					&& (name == null || name.equals(method.getName(nameType)))
+					&& (ret == null || !readRefs.contains(ret) && readRefs.contains(method))) {
+				ret = method;
+			}
+		}
+
+		return ret;
 	}
 
 	@Override

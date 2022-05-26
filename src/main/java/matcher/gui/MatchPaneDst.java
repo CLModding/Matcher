@@ -417,6 +417,8 @@ public class MatchPaneDst extends SplitPane implements IFwdGuiComponent, ISelect
 				break;
 			case "class":
 			case "package":
+			case "inner":
+			case "outer":
 				opTypeA = OP_TYPE_STRING;
 				break;
 			default:
@@ -537,15 +539,20 @@ public class MatchPaneDst extends SplitPane implements IFwdGuiComponent, ISelect
 			case "contains":
 				stack.add(((String) opA).contains((String) opB));
 				break;
-			case "class": { // extract class (cls) from some/pkg/cls
-				String s = (String) opA;
-				stack.add(s.substring(s.lastIndexOf('/') + 1));
+			case "class": // extract class (cls) from some/pkg/cls
+				stack.add(ClassInstance.getClassName((String) opA));
+				break;
+			case "package": { // extract package (some/pkg) from some/pkg/cls
+				String res = ClassInstance.getPackageName((String) opA);
+				stack.add(res != null ? res : "");
 				break;
 			}
-			case "package": { // extract package (some/pkg) from some/pkg/cls
-				String s = (String) opA;
-				int end = s.lastIndexOf('/');
-				stack.add(end < 0 ? s : s.substring(0, end));
+			case "inner":
+				stack.add(ClassInstance.getInnerName((String) opA));
+				break;
+			case "outer": {
+				String res = ClassInstance.getOuterName((String) opA);
+				stack.add(res != null ? res : "");
 				break;
 			}
 			}

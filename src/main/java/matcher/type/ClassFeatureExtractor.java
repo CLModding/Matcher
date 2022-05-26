@@ -1,5 +1,7 @@
 package matcher.type;
 
+import java.net.URI;
+import java.nio.file.FileSystem;
 import matcher.NameType;
 import matcher.Util;
 import matcher.type.Analysis.CommonClasses;
@@ -13,6 +15,19 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
+import org.objectweb.asm.Handle;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldInsnNode;
+import org.objectweb.asm.tree.InvokeDynamicInsnNode;
+import org.objectweb.asm.tree.MethodInsnNode;
+import org.objectweb.asm.tree.TypeInsnNode;
+
+import matcher.NameType;
+import matcher.Util;
+import matcher.type.Analysis.CommonClasses;
+
 public class ClassFeatureExtractor implements LocalClassEnv {
 	public ClassFeatureExtractor(ClassEnvironment env) {
 		this.env = env;
@@ -24,9 +39,10 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 
 		for (Path archive : uniqueInputs) {
 			inputFiles.add(new InputFile(archive));
+			URI origin = archive.toUri();
 
 			Util.iterateJar(archive, true, file -> {
-				ClassInstance cls = readClass(file, obfuscatedCheck);
+				ClassInstance cls = readClass(file, origin, obfuscatedCheck);
 				String id = cls.getId();
 				String name = cls.getName();
 
@@ -49,7 +65,7 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		for (Path archive : classPath) {
 			cpFiles.add(new InputFile(archive));
 
-			env.addOpenFileSystem(Util.iterateJar(archive, false, file -> {
+			FileSystem fs = Util.iterateJar(archive, false, file -> {
 				String name = file.toAbsolutePath().toString();
 				if (!name.startsWith("/") || !name.endsWith(".class") || name.startsWith("//")) throw new RuntimeException("invalid path: "+archive+" ("+name+")");
 				name = name.substring(1, name.length() - ".class".length());
@@ -60,7 +76,9 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 					/*ClassNode cn = readClass(file);
 					addSharedCls(new ClassInstance(ClassInstance.getId(cn.name), file.toUri(), cn));*/
 				}
-			}));
+			});
+
+			if (fs != null) env.addOpenFileSystem(fs);
 		}
 	}
 
@@ -68,16 +86,16 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		return pattern == null || !pattern.matcher(cn.name).matches();
 	}
 
-	private ClassInstance readClass(Path path, Predicate<ClassNode> nameObfuscated) {
+	private ClassInstance readClass(Path path, URI origin, Predicate<ClassNode> nameObfuscated) {
 		ClassNode cn = ClassEnvironment.readClass(path, false);
 
-		return new ClassInstance(ClassInstance.getId(cn.name), path.toUri(), this, cn, nameObfuscated.test(cn));
+		return new ClassInstance(ClassInstance.getId(cn.name), origin, this, cn, nameObfuscated.test(cn));
 	}
 
 	private static void mergeClasses(ClassInstance from, ClassInstance to) {
 		assert from.getAsmNodes().length == 1;
 
-		to.addAsmNode(from.getAsmNodes()[0]);
+		to.addAsmNode(from.getAsmNodes()[0], from.getOrigin());
 	}
 
 	public void process(Pattern nonObfuscatedMemberPattern) {
@@ -88,7 +106,7 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		List<ClassInstance> initialClasses = new ArrayList<>(classes.values());
 
 		for (ClassInstance cls : initialClasses) {
-			ClassEnvironment.processClassA(cls, nonObfuscatedMemberPattern);
+			if (cls.isReal()) ClassEnvironment.processClassA(cls, nonObfuscatedMemberPattern);
 		}
 
 		initStep++;
@@ -97,16 +115,20 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		assert initialClasses.size() == new HashSet<>(initialClasses).size();
 
 		for (ClassInstance cls : initialClasses) {
-			processClassB(cls);
+			if (cls.isReal()) processClassB(cls);
 		}
+
+		processPending(null);
 
 		initStep++;
 		initialClasses.clear();
 		initialClasses.addAll(classes.values());
 
 		for (ClassInstance cls : initialClasses) {
-			processClassC(cls);
+			if (cls.isReal()) processClassC(cls);
 		}
+
+		processPending(null);
 
 		initStep++;
 		initialClasses.clear();
@@ -115,8 +137,10 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		CommonClasses common = new CommonClasses(this);
 
 		for (ClassInstance cls : initialClasses) {
-			processClassD(cls, common);
+			if (cls.isReal()) processClassD(cls, common);
 		}
+
+		processPending(common);
 
 		initStep++;
 
@@ -124,7 +148,7 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		AtomicInteger vmIdx = new AtomicInteger();
 
 		for (ClassInstance cls : initialClasses) {
-			if (cls.getUri() == null || !cls.isInput()) continue;
+			if (!cls.isReal() || !cls.isInput()) continue;
 
 			int curClsIdx = cls.nameObfuscated ? clsIdx++ : -1;
 
@@ -132,6 +156,42 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		}
 
 		initStep++;
+	}
+
+	private void processPending(CommonClasses commonClasses) {
+		if (pendingInit.isEmpty()) return;
+
+		List<List<ClassInstance>> steps = new ArrayList<>(initStep - 1);
+
+		for (int i = 1; i < initStep; i++) {
+			steps.add(new ArrayList<>());
+		}
+
+		pendingInitLoop: do {
+			steps.get(0).addAll(pendingInit);
+			pendingInit.clear();
+
+			for (int i = 1; i < initStep; i++) {
+				for (ClassInstance cls : steps.get(i - 1)) {
+					assert cls.isReal();
+
+					switch (i) {
+					case 1: processClassB(cls); break;
+					case 2: processClassC(cls); break;
+					case 3: processClassD(cls, commonClasses); break;
+					default: throw new IllegalStateException();
+					}
+				}
+
+				if (i + 1 < initStep) {
+					steps.get(i).addAll(steps.get(i - 1));
+				}
+
+				steps.get(i - 1).clear();
+
+				if (!pendingInit.isEmpty()) continue pendingInitLoop;
+			}
+		} while (!pendingInit.isEmpty());
 	}
 
 	public void reset() {
@@ -395,7 +455,11 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 	private void determineMethodType(MethodInstance method) {
 		MethodType type;
 
-		if (isLambdaMethod(method)) {
+		if (method.getId().startsWith("<clinit>")) {
+			type = MethodType.CLASS_INIT;
+		} else if (method.getId().startsWith("<init>")) {
+			type = MethodType.CONSTRUCTOR;
+		} else if (isLambdaMethod(method)) {
 			type = MethodType.LAMBDA_IMPL;
 		} else {
 			type = MethodType.OTHER;
@@ -575,10 +639,26 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 			}
 		} else {
 			if ((ret = classes.get(id)) != null) return ret;
-			if ((ret = env.getSharedClsById(id)) != null) return ret;
+
+			// try shared non-artificial class
+			ClassInstance sharedRet = env.getSharedClsById(id);
+			if (sharedRet != null && sharedRet.isReal()) return sharedRet;
+
+			// try reading class from class path
 			if ((ret = createClassPathClass(id)) != null) return ret;
 
-			ret = env.getMissingCls(id, createUnknown);
+			// try shared artificial class
+			if (sharedRet != null) return sharedRet;
+
+			// create shared missing class
+			//ret = env.getMissingCls(id, createUnknown);
+
+			// try shared jvm-cp class
+			if ((ret = env.getMissingCls(id, false)) != null || !createUnknown) return ret;
+
+			// create local artificial class
+			ret = new ClassInstance(id, this);
+			classes.put(id, ret);
 		}
 
 		return ret;
@@ -593,16 +673,14 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 		if (file == null) return null;
 
 		ClassNode cn = ClassEnvironment.readClass(file, false);
-		ClassInstance cls = new ClassInstance(ClassInstance.getId(cn.name), file.toUri(), this, cn);
+		ClassInstance cls = new ClassInstance(ClassInstance.getId(cn.name), ClassEnvironment.getContainingUri(file.toUri(), cn.name), this, cn);
 		if (!cls.getId().equals(id)) throw new RuntimeException("mismatched cls id "+id+" for "+file+", expected "+name);
 
 		ClassInstance prev = classes.putIfAbsent(cls.getId(), cls);
 		assert prev == null;
 
 		if (initStep > 0) ClassEnvironment.processClassA(cls, null);
-		if (initStep > 1) processClassB(cls);
-		if (initStep > 2) processClassC(cls);
-		if (initStep > 3) processClassD(cls, new CommonClasses(this));
+		if (initStep > 1) pendingInit.add(cls);
 
 		return cls;
 	}
@@ -626,4 +704,5 @@ public class ClassFeatureExtractor implements LocalClassEnv {
 	private final Map<String, ClassInstance> arrayClasses = new HashMap<>();
 
 	private int initStep;
+	private final List<ClassInstance> pendingInit = new ArrayList<>();
 }
