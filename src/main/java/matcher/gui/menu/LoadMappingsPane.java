@@ -10,6 +10,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 
+import jfxtras.styles.jmetro.JMetroStyleClass;
 import matcher.gui.GuiConstants;
 import matcher.mapping.MappingField;
 

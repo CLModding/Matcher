@@ -5,6 +5,7 @@ import javafx.scene.control.SplitPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import jfxtras.styles.jmetro.JMetroStyleClass;
 import matcher.NameType;
 import matcher.classifier.*;
 import matcher.type.*;
@@ -21,6 +22,7 @@ public class MatchPaneDst extends SplitPane implements IFwdGuiComponent, ISelect
 	}
 
 	private void init() {
+		getStyleClass().add(JMetroStyleClass.BACKGROUND);
 		// content
 
 		ContentPane content = new ContentPane(gui, this, false);

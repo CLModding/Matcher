@@ -13,6 +13,8 @@ import javafx.scene.control.ProgressBar;
 import javafx.scene.layout.*;
 import javafx.stage.*;
 import javafx.stage.FileChooser.ExtensionFilter;
+import jfxtras.styles.jmetro.JMetro;
+import jfxtras.styles.jmetro.Style;
 import matcher.Matcher;
 import matcher.NameType;
 import matcher.config.Config;
@@ -76,12 +78,16 @@ public class Gui extends Application {
 		}
 
 		darkTheme = Config.getDarkTheme();
-		darkThemeCss = Gui.class.getResource("/ui/styles/dark.css").toExternalForm();
+		jMetro = new JMetro(scene, getJMetroStyle());
 		updateCss();
 
 		stage.setScene(scene);
 		stage.setTitle("Matcher");
 		stage.show();
+	}
+
+	public Style getJMetroStyle() {
+		return darkTheme ? Style.DARK : Style.LIGHT;
 	}
 
 	@Override
@@ -211,11 +217,7 @@ public class Gui extends Application {
 	}
 
 	private void updateCss() {
-		if (darkTheme) {
-			scene.getStylesheets().add(darkThemeCss);
-		} else {
-			scene.getStylesheets().removeAll(darkThemeCss);
-		}
+		jMetro.setStyle(getJMetroStyle());
 	}
 
 	public NameType getNameType() {
@@ -333,6 +335,7 @@ public class Gui extends Application {
 
 	public void showAlert(AlertType type, String title, String headerText, String text) {
 		Alert alert = new Alert(type, text);
+		new JMetro(alert.getDialogPane().getScene(), getJMetroStyle());
 
 		alert.setTitle(title);
 		alert.setHeaderText(headerText);
@@ -344,6 +347,7 @@ public class Gui extends Application {
 
 	public boolean requestConfirmation(String title, String headerText, String text) {
 		Alert alert = new Alert(AlertType.CONFIRMATION, text);
+		new JMetro(alert.getDialogPane().getScene(), getJMetroStyle());
 
 		alert.setTitle(title);
 		alert.setHeaderText(headerText);
@@ -469,6 +473,7 @@ public class Gui extends Application {
 	private Matcher matcher;
 
 	private Scene scene;
+	private JMetro jMetro;
 	private final Collection<IGuiComponent> components = new ArrayList<>();
 
 	private MainMenuBar menu;
@@ -482,7 +487,6 @@ public class Gui extends Application {
 	private boolean showNonInputs;
 	private boolean useDiffColors;
 
-	private String darkThemeCss;
 	private boolean darkTheme;
 
 	private NameType nameType = NameType.MAPPED_PLAIN;

@@ -5,6 +5,7 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
+import jfxtras.styles.jmetro.JMetroStyleClass;
 import matcher.classifier.ClassifierLevel;
 import matcher.classifier.FieldClassifier;
 import matcher.classifier.MethodClassifier;
@@ -25,6 +26,7 @@ public class BottomPane extends StackPane implements IGuiComponent {
 	}
 
 	private void init() {
+		getStyleClass().add(JMetroStyleClass.BACKGROUND);
 		setPadding(new Insets(GuiConstants.padding));
 
 		HBox center = new HBox(GuiConstants.padding);

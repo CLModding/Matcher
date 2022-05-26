@@ -52,7 +52,8 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 dependencies {
-    implementation "com.github.javaparser:javaparser-core:3.24.2"
+	implementation("org.jfxtras:jmetro:11.6.15")
+	implementation "com.github.javaparser:javaparser-core:3.24.2"
 	implementation "org.quiltmc:procyon-quilt-compilertools:0.5.35.local"
 	api "org.ow2.asm:asm:9.1"
 	implementation "org.ow2.asm:asm-commons:9.1"

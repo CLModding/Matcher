@@ -21,6 +21,7 @@ import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
 import javafx.stage.Window;
 
+import jfxtras.styles.jmetro.*;
 import net.fabricmc.mappingio.MappingReader;
 import net.fabricmc.mappingio.format.MappingFormat;
 
@@ -117,7 +118,7 @@ public class FileMenu extends Menu {
 
 		if (showConfigDialog) {
 			Dialog<ProjectConfig> dialog = new Dialog<>();
-			//dialog.initModality(Modality.APPLICATION_MODAL);
+			initJMetroForDialog(dialog.getDialogPane());
 			dialog.setResizable(true);
 			dialog.setTitle("Project configuration");
 			dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
@@ -174,6 +175,8 @@ public class FileMenu extends Menu {
 
 	public ProjectLoadSettings requestProjectLoadSettings() {
 		Dialog<ProjectLoadSettings> dialog = new Dialog<>();
+		initJMetroForDialog(dialog.getDialogPane());
+
 		//dialog.initModality(Modality.APPLICATION_MODAL);
 		dialog.setResizable(true);
 		dialog.setTitle("Project paths");
@@ -216,6 +219,8 @@ public class FileMenu extends Menu {
 			List<String> namespaces = MappingReader.getNamespaces(file, format);
 
 			Dialog<MappingsLoadSettings> dialog = new Dialog<>();
+			initJMetroForDialog(dialog.getDialogPane());
+
 			//dialog.initModality(Modality.APPLICATION_MODAL);
 			dialog.setResizable(true);
 			dialog.setTitle("Import Settings");
@@ -324,6 +329,8 @@ public class FileMenu extends Menu {
 		}
 
 		Dialog<MappingsSaveSettings> dialog = new Dialog<>();
+		initJMetroForDialog(dialog.getDialogPane());
+
 		//dialog.initModality(Modality.APPLICATION_MODAL);
 		dialog.setResizable(true);
 		dialog.setTitle("Mappings export settings");
@@ -352,6 +359,10 @@ public class FileMenu extends Menu {
 				e.printStackTrace();
 			}
 		});
+	}
+
+	private void initJMetroForDialog(DialogPane dialog) {
+		new JMetro(gui.getJMetroStyle()).setScene(dialog.getScene());
 	}
 
 	private static boolean isDirEmpty(Path dir) {

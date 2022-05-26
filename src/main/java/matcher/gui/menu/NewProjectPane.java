@@ -11,6 +11,7 @@ import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
 import javafx.stage.Window;
+import jfxtras.styles.jmetro.JMetroStyleClass;
 import matcher.config.ProjectConfig;
 import matcher.gui.Gui;
 import matcher.gui.Gui.SelectedFile;

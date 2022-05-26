@@ -26,6 +26,7 @@ module matcher {
 	requires org.objectweb.asm.util;
 	requires procyon.compilertools;
 	requires transitive net.fabricmc.mappingio;
+    requires org.jfxtras.styles.jmetro;
 
-	uses matcher.Plugin;
+    uses matcher.Plugin;
 }

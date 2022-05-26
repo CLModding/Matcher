@@ -1,6 +1,7 @@
 package matcher.gui;
 
 import javafx.scene.control.TabPane;
+import jfxtras.styles.jmetro.JMetroStyleClass;
 import matcher.gui.tab.*;
 
 import java.util.ArrayList;
@@ -16,6 +17,7 @@ public class ContentPane extends TabPane implements IFwdGuiComponent {
 	}
 
 	private void init(ISelectionProvider selectionProvider) {
+		getStyleClass().add(JMetroStyleClass.BACKGROUND);
 		// source tab
 
 		SourcecodeTab scTab = new SourcecodeTab(gui, selectionProvider, isSource);

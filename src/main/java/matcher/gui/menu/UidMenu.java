@@ -17,6 +17,7 @@ import javafx.scene.control.Dialog;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
+import jfxtras.styles.jmetro.JMetro;
 import matcher.Matcher;
 import matcher.config.Config;
 import matcher.config.UidConfig;
@@ -72,6 +73,7 @@ public class UidMenu extends Menu {
 
 	private void setup() {
 		Dialog<UidConfig> dialog = new Dialog<>();
+		new JMetro(dialog.getDialogPane().getScene(), gui.getJMetroStyle());
 		//dialog.initModality(Modality.APPLICATION_MODAL);
 		dialog.setResizable(true);
 		dialog.setTitle("UID Setup");

@@ -7,6 +7,7 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
+import jfxtras.styles.jmetro.JMetroStyleClass;
 import matcher.NameType;
 import matcher.Util;
 import matcher.gui.Gui.SortKey;
@@ -22,6 +23,7 @@ public class MatchPaneSrc extends SplitPane implements IFwdGuiComponent, ISelect
 	}
 
 	private void init() {
+		getStyleClass().add(JMetroStyleClass.BACKGROUND);
 		// lists
 
 		SplitPane verticalPane = new SplitPane();
