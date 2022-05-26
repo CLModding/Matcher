@@ -316,7 +316,7 @@ public abstract class MemberInstance<T extends MemberInstance<T>> implements Mat
 
 	@Override
 	public boolean isMatchable() {
-		return hierarchyData != null && hierarchyData.matchable && cls.isMatchable();
+		return !isReal() || hierarchyData != null && hierarchyData.matchable && cls.isMatchable();
 	}
 
 	@Override
