@@ -10,6 +10,7 @@ import matcher.classifier.ClassifierLevel;
 import matcher.classifier.FieldClassifier;
 import matcher.classifier.MethodClassifier;
 import matcher.classifier.RankResult;
+import matcher.gui.undo.UndoManager;
 import matcher.type.*;
 
 import java.util.*;
@@ -142,38 +143,40 @@ public class BottomPane extends StackPane implements IGuiComponent {
 	}
 
 	private void match() {
-		ClassInstance clsA = srcPane.getSelectedClass();
-		ClassInstance clsB = dstPane.getSelectedClass();
+		try (UndoManager ignored = UndoManager.INSTANCE.group()) {
+			ClassInstance clsA = srcPane.getSelectedClass();
+			ClassInstance clsB = dstPane.getSelectedClass();
 
-		if (canMatchClasses(clsA, clsB)) {
-			gui.getMatcher().match(clsA, clsB);
-			gui.onMatchChange(EnumSet.allOf(MatchType.class));
-			return;
-		}
-
-		MemberInstance<?> memberA = srcPane.getSelectedMethod();
-		if (memberA == null) memberA = srcPane.getSelectedField();
-		MemberInstance<?> memberB = dstPane.getSelectedMethod();
-		if (memberB == null) memberB = dstPane.getSelectedField();
-
-		if (canMatchMembers(memberA, memberB)) {
-			if (memberA instanceof MethodInstance) {
-				gui.getMatcher().match((MethodInstance) memberA, (MethodInstance) memberB);
-				gui.onMatchChange(EnumSet.of(MatchType.Method));
-			} else {
-				gui.getMatcher().match((FieldInstance) memberA, (FieldInstance) memberB);
-				gui.onMatchChange(EnumSet.of(MatchType.Field));
+			if (canMatchClasses(clsA, clsB)) {
+				gui.getMatcher().match(clsA, clsB);
+				gui.onMatchChange(EnumSet.allOf(MatchType.class));
+				return;
 			}
 
-			return;
-		}
+			MemberInstance<?> memberA = srcPane.getSelectedMethod();
+			if (memberA == null) memberA = srcPane.getSelectedField();
+			MemberInstance<?> memberB = dstPane.getSelectedMethod();
+			if (memberB == null) memberB = dstPane.getSelectedField();
 
-		MethodVarInstance varA = srcPane.getSelectedMethodVar();
-		MethodVarInstance varB = dstPane.getSelectedMethodVar();
+			if (canMatchMembers(memberA, memberB)) {
+				if (memberA instanceof MethodInstance) {
+					gui.getMatcher().match((MethodInstance) memberA, (MethodInstance) memberB);
+					gui.onMatchChange(EnumSet.of(MatchType.Method));
+				} else {
+					gui.getMatcher().match((FieldInstance) memberA, (FieldInstance) memberB);
+					gui.onMatchChange(EnumSet.of(MatchType.Field));
+				}
 
-		if (canMatchVars(varA, varB)) {
-			gui.getMatcher().match(varA, varB);
-			gui.onMatchChange(EnumSet.of(MatchType.MethodVar));
+				return;
+			}
+
+			MethodVarInstance varA = srcPane.getSelectedMethodVar();
+			MethodVarInstance varB = dstPane.getSelectedMethodVar();
+
+			if (canMatchVars(varA, varB)) {
+				gui.getMatcher().match(varA, varB);
+				gui.onMatchChange(EnumSet.of(MatchType.MethodVar));
+			}
 		}
 	}
 
@@ -194,66 +197,68 @@ public class BottomPane extends StackPane implements IGuiComponent {
 	}
 
 	private void matchPerfectMembers() {
-		ClassInstance clsA = srcPane.getSelectedClass();
+		try (UndoManager ignored = UndoManager.INSTANCE.group()) {
+			ClassInstance clsA = srcPane.getSelectedClass();
 
-		if (!canMatchPerfectMembers(clsA)) return;
+			if (!canMatchPerfectMembers(clsA)) return;
 
-		ClassInstance clsB = clsA.getMatch();
+			ClassInstance clsB = clsA.getMatch();
 
-		final double minMethodScore = MethodClassifier.getMaxScore(ClassifierLevel.Full) - 1e-6;
-		Map<MethodInstance, MethodInstance> matchedMethods = new IdentityHashMap<>();
-		boolean matchedAnyMethods = false;
+			final double minMethodScore = MethodClassifier.getMaxScore(ClassifierLevel.Full) - 1e-6;
+			Map<MethodInstance, MethodInstance> matchedMethods = new IdentityHashMap<>();
+			boolean matchedAnyMethods = false;
 
-		for (MethodInstance m : clsA.getMethods()) {
-			if (m.hasMatch() || !m.isMatchable()) continue;
+			for (MethodInstance m : clsA.getMethods()) {
+				if (m.hasMatch() || !m.isMatchable()) continue;
 
-			List<RankResult<MethodInstance>> results = MethodClassifier.rank(m, clsB.getMethods(), ClassifierLevel.Full, gui.getEnv());
+				List<RankResult<MethodInstance>> results = MethodClassifier.rank(m, clsB.getMethods(), ClassifierLevel.Full, gui.getEnv());
 
-			if (!results.isEmpty() && results.get(0).getScore() >= minMethodScore && (results.size() == 1 || results.get(1).getScore() < minMethodScore)) {
-				MethodInstance match = results.get(0).getSubject();
-				MethodInstance prev = matchedMethods.putIfAbsent(match, m);
-				if (prev != null) matchedMethods.put(match, null);
+				if (!results.isEmpty() && results.get(0).getScore() >= minMethodScore && (results.size() == 1 || results.get(1).getScore() < minMethodScore)) {
+					MethodInstance match = results.get(0).getSubject();
+					MethodInstance prev = matchedMethods.putIfAbsent(match, m);
+					if (prev != null) matchedMethods.put(match, null);
+				}
 			}
-		}
 
-		for (Map.Entry<MethodInstance, MethodInstance> entry : matchedMethods.entrySet()) {
-			if (entry.getValue() == null) continue;
+			for (Map.Entry<MethodInstance, MethodInstance> entry : matchedMethods.entrySet()) {
+				if (entry.getValue() == null) continue;
 
-			gui.getMatcher().match(entry.getValue(), entry.getKey());
-			matchedAnyMethods = true;
-		}
-
-		final double minFieldScore = FieldClassifier.getMaxScore(ClassifierLevel.Full) - 1e-6;
-		Map<FieldInstance, FieldInstance> matchedFields = new IdentityHashMap<>();
-		boolean matchedAnyFields = false;
-
-		for (FieldInstance m : clsA.getFields()) {
-			if (m.hasMatch() || !m.isMatchable()) continue;
-
-			List<RankResult<FieldInstance>> results = FieldClassifier.rank(m, clsB.getFields(), ClassifierLevel.Full, gui.getEnv());
-
-			if (!results.isEmpty() && results.get(0).getScore() >= minFieldScore && (results.size() == 1 || results.get(1).getScore() < minFieldScore)) {
-				FieldInstance match = results.get(0).getSubject();
-				FieldInstance prev = matchedFields.putIfAbsent(match, m);
-				if (prev != null) matchedFields.put(match, null);
+				gui.getMatcher().match(entry.getValue(), entry.getKey());
+				matchedAnyMethods = true;
 			}
+
+			final double minFieldScore = FieldClassifier.getMaxScore(ClassifierLevel.Full) - 1e-6;
+			Map<FieldInstance, FieldInstance> matchedFields = new IdentityHashMap<>();
+			boolean matchedAnyFields = false;
+
+			for (FieldInstance m : clsA.getFields()) {
+				if (m.hasMatch() || !m.isMatchable()) continue;
+
+				List<RankResult<FieldInstance>> results = FieldClassifier.rank(m, clsB.getFields(), ClassifierLevel.Full, gui.getEnv());
+
+				if (!results.isEmpty() && results.get(0).getScore() >= minFieldScore && (results.size() == 1 || results.get(1).getScore() < minFieldScore)) {
+					FieldInstance match = results.get(0).getSubject();
+					FieldInstance prev = matchedFields.putIfAbsent(match, m);
+					if (prev != null) matchedFields.put(match, null);
+				}
+			}
+
+			for (Map.Entry<FieldInstance, FieldInstance> entry : matchedFields.entrySet()) {
+				if (entry.getValue() == null) continue;
+
+				gui.getMatcher().match(entry.getValue(), entry.getKey());
+				matchedAnyFields = true;
+			}
+
+			if (!matchedAnyMethods && !matchedAnyFields) return;
+
+			Set<MatchType> matchedTypes = EnumSet.noneOf(MatchType.class);
+
+			if (matchedAnyMethods) matchedTypes.add(MatchType.Method);
+			if (matchedAnyFields) matchedTypes.add(MatchType.Field);
+
+			gui.onMatchChange(matchedTypes);
 		}
-
-		for (Map.Entry<FieldInstance, FieldInstance> entry : matchedFields.entrySet()) {
-			if (entry.getValue() == null) continue;
-
-			gui.getMatcher().match(entry.getValue(), entry.getKey());
-			matchedAnyFields = true;
-		}
-
-		if (!matchedAnyMethods && !matchedAnyFields) return;
-
-		Set<MatchType> matchedTypes = EnumSet.noneOf(MatchType.class);
-
-		if (matchedAnyMethods) matchedTypes.add(MatchType.Method);
-		if (matchedAnyFields) matchedTypes.add(MatchType.Field);
-
-		gui.onMatchChange(matchedTypes);
 	}
 
 	private boolean canUnmatchClass(ClassInstance cls) {
@@ -261,12 +266,14 @@ public class BottomPane extends StackPane implements IGuiComponent {
 	}
 
 	private void unmatchClass() {
-		ClassInstance cls = srcPane.getSelectedClass();
+		try (UndoManager ignored = UndoManager.INSTANCE.group()) {
+			ClassInstance cls = srcPane.getSelectedClass();
 
-		if (!canUnmatchClass(cls)) return;
+			if (!canUnmatchClass(cls)) return;
 
-		gui.getMatcher().unmatch(cls);
-		gui.onMatchChange(EnumSet.allOf(MatchType.class));
+			gui.getMatcher().unmatch(cls);
+			gui.onMatchChange(EnumSet.allOf(MatchType.class));
+		}
 	}
 
 	private boolean canUnmatchMember(MemberInstance<?> member) {
@@ -274,17 +281,19 @@ public class BottomPane extends StackPane implements IGuiComponent {
 	}
 
 	private void unmatchMember() {
-		MemberInstance<?> member = srcPane.getSelectedMethod();
-		if (member == null) member = srcPane.getSelectedField();
+		try (UndoManager ignored = UndoManager.INSTANCE.group()) {
+			MemberInstance<?> member = srcPane.getSelectedMethod();
+			if (member == null) member = srcPane.getSelectedField();
 
-		if (!canUnmatchMember(member)) return;
+			if (!canUnmatchMember(member)) return;
 
-		gui.getMatcher().unmatch(member);
+			gui.getMatcher().unmatch(member);
 
-		if (member instanceof MethodInstance) {
-			gui.onMatchChange(EnumSet.of(MatchType.Method, MatchType.MethodVar));
-		} else {
-			gui.onMatchChange(EnumSet.of(MatchType.Field));
+			if (member instanceof MethodInstance) {
+				gui.onMatchChange(EnumSet.of(MatchType.Method, MatchType.MethodVar));
+			} else {
+				gui.onMatchChange(EnumSet.of(MatchType.Field));
+			}
 		}
 	}
 
@@ -293,49 +302,53 @@ public class BottomPane extends StackPane implements IGuiComponent {
 	}
 
 	private void unmatchVar() {
-		MethodVarInstance var = srcPane.getSelectedMethodVar();
-		if (!canUnmatchVar(var)) return;
+		try (UndoManager ignored = UndoManager.INSTANCE.group()) {
+			MethodVarInstance var = srcPane.getSelectedMethodVar();
+			if (!canUnmatchVar(var)) return;
 
-		gui.getMatcher().unmatch(var);
-		gui.onMatchChange(EnumSet.of(MatchType.MethodVar));
+			gui.getMatcher().unmatch(var);
+			gui.onMatchChange(EnumSet.of(MatchType.MethodVar));
+		}
 	}
 
 	private void toggleMatchable() {
-		ClassInstance cls = srcPane.getSelectedClass();
-		if (cls == null) return;
+		try (UndoManager ignored = UndoManager.INSTANCE.group()) {
+			ClassInstance cls = srcPane.getSelectedClass();
+			if (cls == null) return;
 
-		if (!cls.isMatchable() || !cls.hasMatch()) {
-			boolean newValue = !cls.isMatchable();
-			if (!newValue && !cls.hasPotentialMatch()) return;
+			if (!cls.isMatchable() || !cls.hasMatch()) {
+				boolean newValue = !cls.isMatchable();
+				if (!newValue && !cls.hasPotentialMatch()) return;
 
-			cls.setMatchable(newValue);
-			gui.onMatchChange(EnumSet.allOf(MatchType.class));
-			return;
-		}
-
-		MemberInstance<?> member = srcPane.getSelectedMethod();
-		if (member == null) member = srcPane.getSelectedField();
-
-		if (!member.isMatchable() || !member.hasMatch()) {
-			boolean newValue = !member.isMatchable();
-			if (!newValue && !member.hasPotentialMatch()) return;
-
-			if (member.setMatchable(newValue)) {
-				gui.onMatchChange(member instanceof MethodInstance ? EnumSet.of(MatchType.Method, MatchType.MethodVar) : EnumSet.of(MatchType.Field));
+				cls.setMatchable(newValue);
+				gui.onMatchChange(EnumSet.allOf(MatchType.class));
+				return;
 			}
 
-			return;
-		}
+			MemberInstance<?> member = srcPane.getSelectedMethod();
+			if (member == null) member = srcPane.getSelectedField();
 
-		MethodVarInstance var = srcPane.getSelectedMethodVar();
+			if (!member.isMatchable() || !member.hasMatch()) {
+				boolean newValue = !member.isMatchable();
+				if (!newValue && !member.hasPotentialMatch()) return;
 
-		if (!var.isMatchable() || !var.hasMatch()) {
-			boolean newValue = !var.isMatchable();
-			if (!newValue && !var.hasPotentialMatch()) return;
+				if (member.setMatchable(newValue)) {
+					gui.onMatchChange(member instanceof MethodInstance ? EnumSet.of(MatchType.Method, MatchType.MethodVar) : EnumSet.of(MatchType.Field));
+				}
 
-			var.setMatchable(!var.isMatchable());
-			gui.onMatchChange(EnumSet.of(MatchType.MethodVar));
-			return;
+				return;
+			}
+
+			MethodVarInstance var = srcPane.getSelectedMethodVar();
+
+			if (!var.isMatchable() || !var.hasMatch()) {
+				boolean newValue = !var.isMatchable();
+				if (!newValue && !var.hasPotentialMatch()) return;
+
+				var.setMatchable(!var.isMatchable());
+				gui.onMatchChange(EnumSet.of(MatchType.MethodVar));
+				return;
+			}
 		}
 	}
 

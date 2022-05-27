@@ -1,11 +1,14 @@
 package matcher.gui;
 
+import java.util.EnumSet;
 import javafx.event.ActionEvent;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCodeCombination;
 import javafx.scene.input.KeyCombination;
 
 import java.util.Map;
+import matcher.gui.undo.UndoManager;
+import matcher.type.MatchType;
 
 class Shortcuts {
 	public static void init(Gui gui) {
@@ -27,5 +30,17 @@ class Shortcuts {
 		accelerators.put(new KeyCodeCombination(KeyCode.I), () -> gui.getBottomPane().getMatchableButton().fireEvent(new ActionEvent()));
 		// A - match 100%
 		accelerators.put(new KeyCodeCombination(KeyCode.A), () -> gui.getBottomPane().getMatchPerfectMembersButton().fireEvent(new ActionEvent()));
+
+		// CTRL + Z - undo
+		accelerators.put(new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_DOWN), () -> {
+			UndoManager.INSTANCE.undo();
+			gui.onMatchChange(EnumSet.allOf(MatchType.class));
+		});
+
+		// CTRL + SHIFT + Z - redo
+		accelerators.put(new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN), () -> {
+			UndoManager.INSTANCE.redo();
+			gui.onMatchChange(EnumSet.allOf(MatchType.class));
+		});
 	}
 }

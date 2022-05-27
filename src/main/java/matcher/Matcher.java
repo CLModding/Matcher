@@ -1,24 +1,20 @@
 package matcher;
 
-import matcher.classifier.*;
-import matcher.config.Config;
-import matcher.config.ProjectConfig;
-import matcher.type.*;
-
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.FileVisitOption;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
-import java.util.function.DoubleConsumer;
-import java.util.function.Function;
-import java.util.function.Predicate;
+import java.util.function.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import matcher.classifier.*;
+import matcher.config.Config;
+import matcher.config.ProjectConfig;
+import matcher.gui.undo.UndoManager;
+import matcher.gui.undo.cmd.MatchMemberActionCommand;
+import matcher.type.*;
 
 public class Matcher {
 	public static void init() {
@@ -137,191 +133,214 @@ public class Matcher {
 	}
 
 	public void match(ClassInstance a, ClassInstance b) {
-		if (a == null) throw new NullPointerException("null class A");
-		if (b == null) throw new NullPointerException("null class B");
-		if (a.getArrayDimensions() != b.getArrayDimensions()) throw new IllegalArgumentException("the classes don't have the same amount of array dimensions");
-		if (a.getMatch() == b) return;
+		try (UndoManager ignored = UndoManager.INSTANCE.group()) {
+			if (a == null) throw new NullPointerException("null class A");
+			if (b == null) throw new NullPointerException("null class B");
+			if (a.getArrayDimensions() != b.getArrayDimensions())
+				throw new IllegalArgumentException("the classes don't have the same amount of array dimensions");
+			if (a.getMatch() == b) return;
 
-		System.out.println("match class "+a+" -> "+b+(a.hasMappedName() ? " ("+a.getName(NameType.MAPPED_PLAIN)+")" : ""));
+			System.out.println("match class "+a+" -> "+b+(a.hasMappedName() ? " ("+a.getName(NameType.MAPPED_PLAIN)+")" : ""));
 
-		if (a.getMatch() != null) {
-			a.getMatch().setMatch(null);
-			unmatchMembers(a);
-		}
-
-		if (b.getMatch() != null) {
-			b.getMatch().setMatch(null);
-			unmatchMembers(b);
-		}
-
-		a.setMatch(b);
-		b.setMatch(a);
-
-		// match array classes
-
-		if (a.isArray()) {
-			ClassInstance elemA = a.getElementClass();
-
-			if (!elemA.hasMatch()) match(elemA, b.getElementClass());
-		} else {
-			for (ClassInstance arrayA : a.getArrays()) {
-				int dims = arrayA.getArrayDimensions();
-
-				for (ClassInstance arrayB : b.getArrays()) {
-					if (arrayB.hasMatch() || arrayB.getArrayDimensions() != dims) continue;
-
-					assert arrayA.getElementClass() == a && arrayB.getElementClass() == b;
-
-					match(arrayA, arrayB);
-					break;
-				}
+			if (a.getMatch() != null) {
+				a.getMatch().setMatch(null);
+				unmatchMembers(a);
 			}
-		}
 
-		// match methods that are not obfuscated or matched via parents/children
+			if (b.getMatch() != null) {
+				b.getMatch().setMatch(null);
+				unmatchMembers(b);
+			}
 
-		for (MethodInstance src : a.getMethods()) {
-			if (!src.isNameObfuscated()) {
-				MethodInstance dst = b.getMethod(src.getId());
+			UndoManager.INSTANCE.add(new MatchMemberActionCommand(this, MatchMemberActionCommand.Action.MATCH, a, b));
 
-				if ((dst != null || (dst = b.getMethod(src.getName(), null)) != null) && !dst.isNameObfuscated()) { // full match or name match with no alternatives
-					match(src, dst);
-					continue;
+			a.setMatch(b);
+			b.setMatch(a);
+
+			// match array classes
+
+			if (a.isArray()) {
+				ClassInstance elemA = a.getElementClass();
+
+				if (!elemA.hasMatch()) match(elemA, b.getElementClass());
+			} else {
+				for (ClassInstance arrayA : a.getArrays()) {
+					int dims = arrayA.getArrayDimensions();
+
+					for (ClassInstance arrayB : b.getArrays()) {
+						if (arrayB.hasMatch() || arrayB.getArrayDimensions() != dims) continue;
+
+						assert arrayA.getElementClass() == a && arrayB.getElementClass() == b;
+
+						match(arrayA, arrayB);
+						break;
+					}
 				}
 			}
 
-			MethodInstance matchedDst = src.getHierarchyMatch();
-			if (matchedDst == null) continue;
+			// match methods that are not obfuscated or matched via parents/children
 
-			Set<MethodInstance> dstHierarchyMembers = matchedDst.getAllHierarchyMembers();
-			if (dstHierarchyMembers.size() <= 1) continue;
+			for (MethodInstance src : a.getMethods()) {
+				if (!src.isNameObfuscated()) {
+					MethodInstance dst = b.getMethod(src.getId());
 
-			for (MethodInstance dst : b.getMethods()) {
-				if (dstHierarchyMembers.contains(dst)) {
-					src.setMatchable(true);
-					dst.setMatchable(true);
-					match(src, dst);
-					break;
+					if ((dst != null || (dst = b.getMethod(src.getName(),
+							null)) != null) && !dst.isNameObfuscated()) { // full match or name match with no alternatives
+						match(src, dst);
+						continue;
+					}
+				}
+
+				MethodInstance matchedDst = src.getHierarchyMatch();
+				if (matchedDst == null) continue;
+
+				Set<MethodInstance> dstHierarchyMembers = matchedDst.getAllHierarchyMembers();
+				if (dstHierarchyMembers.size() <= 1) continue;
+
+				for (MethodInstance dst : b.getMethods()) {
+					if (dstHierarchyMembers.contains(dst)) {
+						src.setMatchable(true);
+						dst.setMatchable(true);
+						match(src, dst);
+						break;
+					}
 				}
 			}
-		}
 
-		// match fields that are not obfuscated
+			// match fields that are not obfuscated
 
-		for (FieldInstance src : a.getFields()) {
-			if (!src.isNameObfuscated()) {
-				FieldInstance dst = b.getField(src.getId());
+			for (FieldInstance src : a.getFields()) {
+				if (!src.isNameObfuscated()) {
+					FieldInstance dst = b.getField(src.getId());
 
-				if ((dst != null || (dst = b.getField(src.getName(), null)) != null) && !dst.isNameObfuscated()) { // full match or name match with no alternatives
-					match(src, dst);
+					if ((dst != null || (dst = b.getField(src.getName(),
+							null)) != null) && !dst.isNameObfuscated()) { // full match or name match with no alternatives
+						match(src, dst);
+					}
 				}
 			}
-		}
 
-		env.getCache().clear();
-	}
+			env.getCache().clear();
 
-	private static void unmatchMembers(ClassInstance cls) {
-		for (MethodInstance m : cls.getMethods()) {
-			if (m.getMatch() != null) {
-				m.getMatch().setMatch(null);
-				m.setMatch(null);
-
-				unmatchArgsVars(m);
-			}
-		}
-
-		for (FieldInstance m : cls.getFields()) {
-			if (m.getMatch() != null) {
-				m.getMatch().setMatch(null);
-				m.setMatch(null);
-			}
 		}
 	}
 
-	private static void unmatchArgsVars(MethodInstance m) {
-		for (MethodVarInstance arg : m.getArgs()) {
-			if (arg.getMatch() != null) {
-				arg.getMatch().setMatch(null);
-				arg.setMatch(null);
+	private void unmatchMembers(ClassInstance cls) {
+		try (UndoManager ignored = UndoManager.INSTANCE.group()) {
+			for (MethodInstance m : cls.getMethods()) {
+				if (m.getMatch() != null) {
+					UndoManager.INSTANCE.add(new MatchMemberActionCommand(this, MatchMemberActionCommand.Action.UNMATCH, m, m.getMatch()));
+
+					m.getMatch().setMatch(null);
+					m.setMatch(null);
+
+					unmatchArgsVars(m);
+				}
+			}
+
+			for (FieldInstance m : cls.getFields()) {
+				if (m.getMatch() != null) {
+					UndoManager.INSTANCE.add(new MatchMemberActionCommand(this, MatchMemberActionCommand.Action.UNMATCH, m, m.getMatch()));
+
+					m.getMatch().setMatch(null);
+					m.setMatch(null);
+				}
 			}
 		}
+	}
 
-		for (MethodVarInstance var : m.getVars()) {
-			if (var.getMatch() != null) {
-				var.getMatch().setMatch(null);
-				var.setMatch(null);
+	private void unmatchArgsVars(MethodInstance m) {
+		try (UndoManager ignored = UndoManager.INSTANCE.group()) {
+			for (MethodVarInstance arg : m.getArgs()) {
+				if (arg.getMatch() != null) {
+					UndoManager.INSTANCE.add(new MatchMemberActionCommand(this, MatchMemberActionCommand.Action.UNMATCH, arg, arg.getMatch()));
+					arg.getMatch().setMatch(null);
+					arg.setMatch(null);
+				}
+			}
+
+			for (MethodVarInstance var : m.getVars()) {
+				if (var.getMatch() != null) {
+					UndoManager.INSTANCE.add(new MatchMemberActionCommand(this, MatchMemberActionCommand.Action.UNMATCH, var, var.getMatch()));
+					var.getMatch().setMatch(null);
+					var.setMatch(null);
+				}
 			}
 		}
 	}
 
 	public void match(MethodInstance a, MethodInstance b) {
-		if (a == null) throw new NullPointerException("null method A");
-		if (b == null) throw new NullPointerException("null method B");
-		if (a.getCls().getMatch() != b.getCls()) throw new IllegalArgumentException("the methods don't belong to the same class");
-		if (a.getMatch() == b) return;
+		try (UndoManager ignored = UndoManager.INSTANCE.group()) {
+			if (a == null) throw new NullPointerException("null method A");
+			if (b == null) throw new NullPointerException("null method B");
+			if (a.getCls().getMatch() != b.getCls()) throw new IllegalArgumentException("the methods don't belong to the same class");
+			if (a.getMatch() == b) return;
 
-		System.out.println("match method "+a+" -> "+b+(a.hasMappedName() ? " ("+a.getName(NameType.MAPPED_PLAIN)+")" : ""));
+			// Add to undo redo stack
+			UndoManager.INSTANCE.add(new MatchMemberActionCommand(this, MatchMemberActionCommand.Action.MATCH, a, b));
 
-		Set<MethodInstance> membersA = a.getAllHierarchyMembers();
-		Set<MethodInstance> membersB = b.getAllHierarchyMembers();
-		assert membersA.contains(a);
-		assert membersB.contains(b);
+			System.out.println("match method "+a+" -> "+b+(a.hasMappedName() ? " ("+a.getName(NameType.MAPPED_PLAIN)+")" : ""));
 
-		if (!a.hasMatchedHierarchy(b)) {
-			if (a.hasHierarchyMatch()) {
-				for (MethodInstance m : membersA) {
-					if (m.hasMatch()) {
-						unmatchArgsVars(m);
-						m.getMatch().setMatch(null);
-						m.setMatch(null);
+			Set<MethodInstance> membersA = a.getAllHierarchyMembers();
+			Set<MethodInstance> membersB = b.getAllHierarchyMembers();
+			assert membersA.contains(a);
+			assert membersB.contains(b);
+
+			if (!a.hasMatchedHierarchy(b)) {
+				if (a.hasHierarchyMatch()) {
+					for (MethodInstance m : membersA) {
+						if (m.hasMatch()) {
+							unmatchArgsVars(m);
+							m.getMatch().setMatch(null);
+							m.setMatch(null);
+						}
 					}
 				}
-			}
 
-			if (b.hasHierarchyMatch()) {
-				for (MethodInstance m : membersB) {
-					if (m.hasMatch()) {
-						unmatchArgsVars(m);
-						m.getMatch().setMatch(null);
-						m.setMatch(null);
+				if (b.hasHierarchyMatch()) {
+					for (MethodInstance m : membersB) {
+						if (m.hasMatch()) {
+							unmatchArgsVars(m);
+							m.getMatch().setMatch(null);
+							m.setMatch(null);
+						}
 					}
 				}
-			}
 
-			ClassEnv reqEnv = a.getCls().getEnv();
+				ClassEnv reqEnv = a.getCls().getEnv();
 
-			for (MethodInstance ca : membersA) {
-				ClassInstance cls = ca.getCls();
-				if (!cls.hasMatch() || cls.getEnv() != reqEnv) continue;
+				for (MethodInstance ca : membersA) {
+					ClassInstance cls = ca.getCls();
+					if (!cls.hasMatch() || cls.getEnv() != reqEnv) continue;
 
-				for (MethodInstance cb : cls.getMatch().getMethods()) {
-					if (membersB.contains(cb)) {
-						assert !ca.hasMatch() && !cb.hasMatch();
-						ca.setMatch(cb);
-						cb.setMatch(ca);
-						break;
+					for (MethodInstance cb : cls.getMatch().getMethods()) {
+						if (membersB.contains(cb)) {
+							assert !ca.hasMatch() && !cb.hasMatch();
+							ca.setMatch(cb);
+							cb.setMatch(ca);
+							break;
+						}
 					}
 				}
-			}
-		} else {
-			if (a.getMatch() != null) {
-				unmatchArgsVars(a);
-				a.getMatch().setMatch(null);
-				a.setMatch(null);
+			} else {
+				if (a.getMatch() != null) {
+					unmatchArgsVars(a);
+					a.getMatch().setMatch(null);
+					a.setMatch(null);
+				}
+
+				if (b.getMatch() != null) {
+					unmatchArgsVars(b);
+					b.getMatch().setMatch(null);
+					b.setMatch(null);
+				}
+
+				a.setMatch(b);
+				b.setMatch(a);
 			}
 
-			if (b.getMatch() != null) {
-				unmatchArgsVars(b);
-				b.getMatch().setMatch(null);
-				b.setMatch(null);
-			}
-
-			a.setMatch(b);
-			b.setMatch(a);
+			env.getCache().clear();
 		}
-
-		env.getCache().clear();
 	}
 
 	public void match(FieldInstance a, FieldInstance b) {
@@ -339,6 +358,9 @@ public class Matcher {
 		b.setMatch(a);
 
 		env.getCache().clear();
+
+		// Add to undo redo stack
+		UndoManager.INSTANCE.add(new MatchMemberActionCommand(this, MatchMemberActionCommand.Action.MATCH, a, b));
 	}
 
 	public void match(MethodVarInstance a, MethodVarInstance b) {
@@ -357,6 +379,39 @@ public class Matcher {
 		b.setMatch(a);
 
 		env.getCache().clear();
+
+		// Add to undo redo stack
+		UndoManager.INSTANCE.add(new MatchMemberActionCommand(this, MatchMemberActionCommand.Action.MATCH, a, b));
+	}
+
+	public void match(Matchable<?> a, Matchable<?> b) {
+		if (a instanceof ClassInstance && b instanceof ClassInstance) {
+			match((ClassInstance) a, (ClassInstance) b);
+		} else if (a instanceof MethodInstance && b instanceof MethodInstance) {
+			match((MethodInstance) a, (MethodInstance) b);
+		} else if (a instanceof FieldInstance && b instanceof FieldInstance) {
+			match((FieldInstance) a, (FieldInstance) b);
+		} else if (a instanceof MethodVarInstance && b instanceof MethodVarInstance) {
+			match((MethodVarInstance) a, (MethodVarInstance) b);
+		} else {
+			throw new IllegalArgumentException("the matchables are not of the same kind");
+		}
+	}
+
+	public void unmatch(Matchable<?> a, Matchable<?> b) {
+		unmatch(a);
+	}
+
+	public void unmatch(Matchable<?> item) {
+		if (item instanceof ClassInstance) {
+			unmatch((ClassInstance) item);
+		} else if (item instanceof MemberInstance<?>) {
+			unmatch((MemberInstance<?>) item);
+		} else if (item instanceof MethodVarInstance) {
+			unmatch((MethodVarInstance) item);
+		} else {
+			throw new IllegalArgumentException("unknown matchable type: " + item);
+		}
 	}
 
 	public void unmatch(ClassInstance cls) {
@@ -365,20 +420,25 @@ public class Matcher {
 
 		System.out.println("unmatch class "+cls+" (was "+cls.getMatch()+")"+(cls.hasMappedName() ? " ("+cls.getName(NameType.MAPPED_PLAIN)+")" : ""));
 
-		cls.getMatch().setMatch(null);
-		cls.setMatch(null);
+		// Add to undo redo stack
+		try (UndoManager ignored = UndoManager.INSTANCE.group()) {
+			UndoManager.INSTANCE.add(new MatchMemberActionCommand(this, MatchMemberActionCommand.Action.UNMATCH, cls, cls.getMatch()));
 
-		unmatchMembers(cls);
+			cls.getMatch().setMatch(null);
+			cls.setMatch(null);
 
-		if (cls.isArray()) {
-			unmatch(cls.getElementClass());
-		} else {
-			for (ClassInstance array : cls.getArrays()) {
-				unmatch(array);
+			unmatchMembers(cls);
+
+			if (cls.isArray()) {
+				unmatch(cls.getElementClass());
+			} else {
+				for (ClassInstance array : cls.getArrays()) {
+					unmatch(array);
+				}
 			}
-		}
 
-		env.getCache().clear();
+			env.getCache().clear();
+		}
 	}
 
 	public void unmatch(MemberInstance<?> m) {
@@ -387,12 +447,19 @@ public class Matcher {
 
 		System.out.println("unmatch member "+m+" (was "+m.getMatch()+")"+(m.hasMappedName() ? " ("+m.getName(NameType.MAPPED_PLAIN)+")" : ""));
 
+		// Add to undo redo stack
+		UndoManager.INSTANCE.add(new MatchMemberActionCommand(this, MatchMemberActionCommand.Action.UNMATCH, m, m.getMatch()));
+
 		if (m instanceof MethodInstance) {
+			// Make sure the arg unmatches are also added to the undo stack
 			for (MethodVarInstance arg : ((MethodInstance) m).getArgs()) {
+				if (arg.hasMatch()) UndoManager.INSTANCE.add(new MatchMemberActionCommand(this, MatchMemberActionCommand.Action.UNMATCH, arg, arg.getMatch()));
 				unmatch(arg);
 			}
 
+			// Make sure the var unmatches are also added to the undo stack
 			for (MethodVarInstance var : ((MethodInstance) m).getVars()) {
+				if (var.hasMatch()) UndoManager.INSTANCE.add(new MatchMemberActionCommand(this, MatchMemberActionCommand.Action.UNMATCH, var, var.getMatch()));
 				unmatch(var);
 			}
 		}
@@ -401,7 +468,9 @@ public class Matcher {
 		m.setMatch(null);
 
 		if (m instanceof MethodInstance) {
+			// Make sure the hierarchy member unmatches are also added to the undo stack
 			for (MemberInstance<?> member : m.getAllHierarchyMembers()) {
+				if (member.hasMatch()) UndoManager.INSTANCE.add(new MatchMemberActionCommand(this, MatchMemberActionCommand.Action.UNMATCH, member, member.getMatch()));
 				unmatch(member);
 			}
 		}
@@ -414,6 +483,9 @@ public class Matcher {
 		if (a.getMatch() == null) return;
 
 		System.out.println("unmatch method var "+a+" (was "+a.getMatch()+")"+(a.hasMappedName() ? " ("+a.getName(NameType.MAPPED_PLAIN)+")" : ""));
+
+		// Add to undo redo stack
+		UndoManager.INSTANCE.add(new MatchMemberActionCommand(this, MatchMemberActionCommand.Action.UNMATCH, a, a.getMatch()));
 
 		a.getMatch().setMatch(null);
 		a.setMatch(null);
