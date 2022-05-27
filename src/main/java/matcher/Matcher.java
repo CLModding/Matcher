@@ -14,6 +14,7 @@ import matcher.config.Config;
 import matcher.config.ProjectConfig;
 import matcher.gui.undo.UndoManager;
 import matcher.gui.undo.cmd.MatchMemberActionCommand;
+import matcher.gui.undo.cmd.MatchMemberMatchableStatusChangeCommand;
 import matcher.type.*;
 
 public class Matcher {
@@ -199,7 +200,9 @@ public class Matcher {
 
 				for (MethodInstance dst : b.getMethods()) {
 					if (dstHierarchyMembers.contains(dst)) {
+						UndoManager.INSTANCE.add(new MatchMemberMatchableStatusChangeCommand(src, true));
 						src.setMatchable(true);
+						UndoManager.INSTANCE.add(new MatchMemberMatchableStatusChangeCommand(dst, true));
 						dst.setMatchable(true);
 						match(src, dst);
 						break;

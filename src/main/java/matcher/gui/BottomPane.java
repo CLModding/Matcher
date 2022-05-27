@@ -9,6 +9,7 @@ import javafx.scene.layout.StackPane;
 import jfxtras.styles.jmetro.JMetroStyleClass;
 import matcher.classifier.*;
 import matcher.gui.undo.UndoManager;
+import matcher.gui.undo.cmd.MatchMemberMatchableStatusChangeCommand;
 import matcher.type.*;
 
 public class BottomPane extends StackPane implements IGuiComponent {
@@ -358,6 +359,7 @@ public class BottomPane extends StackPane implements IGuiComponent {
 				boolean newValue = !cls.isMatchable();
 				if (!newValue && !cls.hasPotentialMatch()) return;
 
+				UndoManager.INSTANCE.add(new MatchMemberMatchableStatusChangeCommand(cls, newValue));
 				cls.setMatchable(newValue);
 				gui.onMatchChange(EnumSet.allOf(MatchType.class));
 				return;
@@ -371,6 +373,7 @@ public class BottomPane extends StackPane implements IGuiComponent {
 				if (!newValue && !member.hasPotentialMatch()) return;
 
 				if (member.setMatchable(newValue)) {
+					UndoManager.INSTANCE.add(new MatchMemberMatchableStatusChangeCommand(member, newValue));
 					gui.onMatchChange(member instanceof MethodInstance ? EnumSet.of(MatchType.Method, MatchType.MethodVar) : EnumSet.of(MatchType.Field));
 				}
 
@@ -383,7 +386,8 @@ public class BottomPane extends StackPane implements IGuiComponent {
 				boolean newValue = !var.isMatchable();
 				if (!newValue && !var.hasPotentialMatch()) return;
 
-				var.setMatchable(!var.isMatchable());
+				UndoManager.INSTANCE.add(new MatchMemberMatchableStatusChangeCommand(member, newValue));
+				var.setMatchable(newValue);
 				gui.onMatchChange(EnumSet.of(MatchType.MethodVar));
 				return;
 			}
