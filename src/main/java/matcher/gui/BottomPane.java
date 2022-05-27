@@ -1,19 +1,15 @@
 package matcher.gui;
 
+import java.util.*;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import jfxtras.styles.jmetro.JMetroStyleClass;
-import matcher.classifier.ClassifierLevel;
-import matcher.classifier.FieldClassifier;
-import matcher.classifier.MethodClassifier;
-import matcher.classifier.RankResult;
+import matcher.classifier.*;
 import matcher.gui.undo.UndoManager;
 import matcher.type.*;
-
-import java.util.*;
 
 public class BottomPane extends StackPane implements IGuiComponent {
 	public BottomPane(Gui gui, MatchPaneSrc srcPane, MatchPaneDst dstPane) {
@@ -250,12 +246,54 @@ public class BottomPane extends StackPane implements IGuiComponent {
 				matchedAnyFields = true;
 			}
 
-			if (!matchedAnyMethods && !matchedAnyFields) return;
+			boolean matchedAnyMethodVars = false;
+			final double minMethodVarScore = MethodVarClassifier.getMaxScore(ClassifierLevel.Full) - 1e-6;
+			Map<MethodVarInstance, MethodVarInstance> matchedMethodVars = new IdentityHashMap<>();
+
+			for (Map.Entry<MethodInstance, MethodInstance> entry : matchedMethods.entrySet()) {
+				MethodInstance a = entry.getKey();
+				MethodInstance b = entry.getValue();
+
+				MethodVarInstance[][] aVars = new MethodVarInstance[][] { a.getVars(), a.getArgs() };
+				MethodVarInstance[][] bVars = new MethodVarInstance[][] { b.getVars(), b.getArgs() };
+
+				for (int varsIndex = 0; varsIndex < aVars.length; varsIndex++) {
+					for (MethodVarInstance var : aVars[varsIndex]) {
+						if (var.hasMatch() || !var.isMatchable()) continue;
+
+						List<RankResult<MethodVarInstance>> results = MethodVarClassifier.rank(var, bVars[varsIndex], ClassifierLevel.Full, gui.getEnv(), Double.POSITIVE_INFINITY);
+
+						if (!results.isEmpty() && results.get(0).getScore() >= minMethodVarScore && (results.size() == 1 || results.get(1).getScore() < minMethodVarScore)) {
+							MethodVarInstance match = results.get(0).getSubject();
+							MethodVarInstance prev = matchedMethodVars.putIfAbsent(match, var);
+							if (prev != null) matchedMethodVars.put(match, null);
+						}
+					}
+				}
+			}
+
+			for (Map.Entry<MethodVarInstance, MethodVarInstance> entry : matchedMethodVars.entrySet()) {
+				if (entry.getValue() == null) continue;
+
+				gui.getMatcher().match(entry.getValue(), entry.getKey());
+				matchedAnyMethodVars = true;
+			}
+
+			for (Map.Entry<MethodVarInstance, MethodVarInstance> entry : matchedMethodVars.entrySet()) {
+				if (entry.getValue() == null) continue;
+
+				gui.getMatcher().match(entry.getValue(), entry.getKey());
+				matchedAnyMethods = true;
+			}
+
+			if (!matchedAnyMethods && !matchedAnyFields && !matchedAnyMethodVars) return;
 
 			Set<MatchType> matchedTypes = EnumSet.noneOf(MatchType.class);
 
 			if (matchedAnyMethods) matchedTypes.add(MatchType.Method);
 			if (matchedAnyFields) matchedTypes.add(MatchType.Field);
+			if (matchedAnyMethodVars) matchedTypes.add(MatchType.MethodVar);
+
 
 			gui.onMatchChange(matchedTypes);
 		}
