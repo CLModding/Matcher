@@ -3,6 +3,8 @@ package matcher.gui.undo;
 import java.util.List;
 import java.util.Stack;
 import matcher.gui.undo.cmd.GroupUndoRedoCommand;
+import matcher.gui.undo.cmd.MatchMemberActionCommand;
+import matcher.type.MethodVarInstance;
 
 public enum UndoManager implements AutoCloseable {
     INSTANCE;
@@ -12,7 +14,7 @@ public enum UndoManager implements AutoCloseable {
     private final Stack<UndoRedoCommand> undoStack = new SizedStack<>(MAX_UNDO_SIZE);
     private final Stack<UndoRedoCommand> redoStack = new SizedStack<>(MAX_UNDO_SIZE);
 
-    private Stack<List<UndoRedoCommand>> temporaryGrouppedCommands = new Stack<>();
+    private final Stack<List<UndoRedoCommand>> temporaryGrouppedCommands = new Stack<>();
 
     private boolean isActive = false;
 
@@ -22,8 +24,32 @@ public enum UndoManager implements AutoCloseable {
             temporaryGrouppedCommands.peek().add(command);
             return;
         }
-        undoStack.push(command);
+        undoStack.push(cleanupCommand(command));
         redoStack.clear();
+    }
+
+    private UndoRedoCommand cleanupCommand(UndoRedoCommand command) {
+        if (command instanceof GroupUndoRedoCommand group) {
+            // Recursively flatten the group command by accessing the nested commands
+            List<UndoRedoCommand> finalCommands = new Stack<>();
+            for (UndoRedoCommand nestedCommand : group.commands()) {
+                finalCommands.add(cleanupCommand(nestedCommand));
+            }
+
+            // Place method vars at the end of the list
+            var methodVars = finalCommands.stream()
+                    .filter(c -> c instanceof MatchMemberActionCommand memberMatch && memberMatch.a() instanceof MethodVarInstance)
+                    .toList();
+
+            // Remove all of these commands whereever they are
+            finalCommands.removeAll(methodVars);
+            // Finally, add them back in at the end
+            finalCommands.addAll(methodVars);
+
+            // Create a new group command with the flattened commands
+            return new GroupUndoRedoCommand(finalCommands);
+        }
+        return command;
     }
 
     public void undo() {
@@ -82,6 +108,7 @@ public enum UndoManager implements AutoCloseable {
             add(new GroupUndoRedoCommand(commands));
         }
     }
+
 
     public UndoManager group() {
         startGrouping();
