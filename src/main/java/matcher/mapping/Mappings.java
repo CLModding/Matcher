@@ -223,6 +223,8 @@ public class Mappings {
 						case AUX:
 						case AUX2:
 						case AUX3:
+						case AUX4:
+						case AUX5:
 							if (!cls.hasAuxName(fieldTarget.type.getAuxIndex()) || replace) {
 								if (ClassInstance.hasOuterName(name)) {
 									name = ClassInstance.getInnerName(name);
@@ -284,6 +286,8 @@ public class Mappings {
 						case AUX:
 						case AUX2:
 						case AUX3:
+						case AUX4:
+						case AUX5:
 							if (!field.hasAuxName(fieldTarget.type.getAuxIndex()) || replace) {
 								for (FieldInstance f : field.getAllHierarchyMembers()) {
 									f.setAuxName(fieldTarget.type.getAuxIndex(), name);
@@ -329,6 +333,8 @@ public class Mappings {
 						case AUX:
 						case AUX2:
 						case AUX3:
+						case AUX4:
+						case AUX5:
 							if (!method.hasAuxName(fieldTarget.type.getAuxIndex()) || replace) {
 								for (MethodInstance m : method.getAllHierarchyMembers()) {
 									m.setAuxName(fieldTarget.type.getAuxIndex(), name);
@@ -369,6 +375,8 @@ public class Mappings {
 						case AUX:
 						case AUX2:
 						case AUX3:
+						case AUX4:
+						case AUX5:
 							if (!arg.hasAuxName(fieldTarget.type.getAuxIndex()) || replace) arg.setAuxName(fieldTarget.type.getAuxIndex(), name);
 							break;
 						case UID:
@@ -387,6 +395,8 @@ public class Mappings {
 						case AUX:
 						case AUX2:
 						case AUX3:
+						case AUX4:
+						case AUX5:
 							if (!var.hasAuxName(fieldTarget.type.getAuxIndex()) || replace) var.setAuxName(fieldTarget.type.getAuxIndex(), name);
 							break;
 						case UID:
@@ -444,6 +454,8 @@ public class Mappings {
 		case AUX:
 		case AUX2:
 		case AUX3:
+		case AUX4:
+		case AUX5:
 		case UID:
 			ClassInstance ret = env.getClsByName(name, type.type);
 
@@ -776,9 +788,13 @@ public class Mappings {
 		case AUX:
 		case AUX2:
 		case AUX3:
+		case AUX4:
+		case AUX5:
 		case AUX_PLAIN:
 		case AUX2_PLAIN:
 		case AUX3_PLAIN:
+		case AUX4_PLAIN:
+		case AUX5_PLAIN:
 			return type.getAuxIndex() > 0 ? String.format("aux%d", type.getAuxIndex()) : "aux";
 		case MAPPED_AUX_PLAIN:
 			return "named-aux";
