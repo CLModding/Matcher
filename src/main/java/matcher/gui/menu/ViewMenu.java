@@ -9,7 +9,7 @@ import matcher.gui.GuiUtil;
 import matcher.gui.IGuiComponent;
 import matcher.srcprocess.BuiltinDecompiler;
 
-public class ViewMenu extends Menu implements IGuiComponent {
+public class ViewMenu extends UserPrefSaveableMenu implements IGuiComponent {
 	ViewMenu(Gui gui) {
 		super("View");
 
@@ -110,6 +110,7 @@ public class ViewMenu extends Menu implements IGuiComponent {
 		});
 
 		getItems().add(menu);
+		loadUserPrefs();
 	}
 
 	@Override
@@ -143,6 +144,7 @@ public class ViewMenu extends Menu implements IGuiComponent {
 				break;
 			}
 		}
+		saveUserPrefs();
 	}
 
 	private final Gui gui;

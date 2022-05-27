@@ -78,7 +78,7 @@ public class Config {
 	}
 
 	public static void saveAsLast() {
-		Preferences root = Preferences.userRoot().node(userPrefFolder);
+		Preferences root = getUserPreferencesNode();
 
 		try {
 			if (projectConfig.isValid()) projectConfig.save(root.node(lastProjectSetupKey));
@@ -94,7 +94,7 @@ public class Config {
 
 	// This should really be in a separate class
 	public static void saveDarkTheme() {
-		Preferences root = Preferences.userRoot().node(userPrefFolder);
+		Preferences root = getUserPreferencesNode();
 
 		try {
 			root.putBoolean(darkThemeKey, darkTheme);
@@ -103,6 +103,10 @@ public class Config {
 		} catch (BackingStoreException e) {
 			throw new RuntimeException(e);
 		}
+	}
+
+	public static Preferences getUserPreferencesNode() {
+		return Preferences.userRoot().node(userPrefFolder);
 	}
 
 	static <T> List<T> loadList(Preferences parent, String key, Function<String, T> deserializer) throws BackingStoreException {
