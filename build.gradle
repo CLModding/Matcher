@@ -30,25 +30,25 @@ sourceSets {
 }
 
 javafx {
-	version = "11.0.2"
+	version = "18"
 	modules = [ 'javafx.controls', 'javafx.web' ]
 }
 
 java {
 	modularity.inferModulePath = true
-	sourceCompatibility = JavaVersion.VERSION_11
-	targetCompatibility = JavaVersion.VERSION_11
+	sourceCompatibility = JavaVersion.VERSION_18
+	targetCompatibility = JavaVersion.VERSION_18
 
-	if (!JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_11)) {
+	if (!JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_18)) {
 		toolchain {
-			languageVersion = JavaLanguageVersion.of(11)
+			languageVersion = JavaLanguageVersion.of(18)
 		}
 	}
 }
 
 tasks.withType(JavaCompile).configureEach {
 	it.options.encoding = "UTF-8"
-	it.options.release = 11
+	it.options.release = 18
 }
 
 dependencies {
@@ -57,7 +57,7 @@ dependencies {
 	implementation "org.ow2.asm:asm-commons:9.3"
 	implementation "org.ow2.asm:asm-util:9.3"
 
-	implementation("org.jfxtras:jmetro:11.6.15")
+	implementation "org.jfxtras:jmetro:11.6.15"
 
 	implementation "com.github.javaparser:javaparser-core:3.24.2"
 
