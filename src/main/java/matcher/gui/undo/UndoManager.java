@@ -103,7 +103,7 @@ public enum UndoManager implements AutoCloseable {
         if (commands.isEmpty()) return;
 
         if (commands.size() == 1) {
-            undoStack.push(commands.get(0));
+            add(commands.get(0));
         } else {
             add(new GroupUndoRedoCommand(commands));
         }
