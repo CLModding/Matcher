@@ -33,14 +33,18 @@ class Shortcuts {
 
 		// CTRL + Z - undo
 		accelerators.put(new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_DOWN), () -> {
-			UndoManager.INSTANCE.undo();
-			gui.onMatchChange(EnumSet.allOf(MatchType.class));
+			if (UndoManager.INSTANCE.canUndo()) {
+				UndoManager.INSTANCE.undo();
+				gui.onMatchChange(EnumSet.allOf(MatchType.class));
+			}
 		});
 
 		// CTRL + SHIFT + Z - redo
 		accelerators.put(new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN), () -> {
-			UndoManager.INSTANCE.redo();
-			gui.onMatchChange(EnumSet.allOf(MatchType.class));
+			if (UndoManager.INSTANCE.canRedo()) {
+				UndoManager.INSTANCE.redo();
+				gui.onMatchChange(EnumSet.allOf(MatchType.class));
+			}
 		});
 	}
 }
