@@ -2,16 +2,18 @@ package matcher.gui.undo;
 
 import java.util.List;
 import java.util.Stack;
+import matcher.gui.IGuiComponent;
 import matcher.gui.undo.cmd.GroupUndoRedoCommand;
 import matcher.gui.undo.cmd.MatchMemberActionCommand;
 import matcher.type.MethodVarInstance;
 
-public enum UndoManager implements AutoCloseable {
+public enum UndoManager implements AutoCloseable, IGuiComponent {
     INSTANCE;
 
     private static final int MAX_UNDO_SIZE = 100;
 
     private final Stack<UndoRedoCommand> undoStack = new SizedStack<>(MAX_UNDO_SIZE);
+
     private final Stack<UndoRedoCommand> redoStack = new SizedStack<>(MAX_UNDO_SIZE);
 
     private final Stack<List<UndoRedoCommand>> temporaryGrouppedCommands = new Stack<>();
@@ -91,6 +93,8 @@ public enum UndoManager implements AutoCloseable {
     public void clear() {
         undoStack.clear();
         redoStack.clear();
+        temporaryGrouppedCommands.clear();
+        isActive = false;
     }
 
     private void startGrouping() {
@@ -109,7 +113,6 @@ public enum UndoManager implements AutoCloseable {
         }
     }
 
-
     public UndoManager group() {
         startGrouping();
         return this;
@@ -118,5 +121,11 @@ public enum UndoManager implements AutoCloseable {
     @Override
     public void close() {
         endGrouping();
+    }
+
+
+    @Override
+    public void onProjectChange() {
+        clear();
     }
 }

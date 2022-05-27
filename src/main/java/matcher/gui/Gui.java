@@ -18,6 +18,7 @@ import matcher.Matcher;
 import matcher.NameType;
 import matcher.config.Config;
 import matcher.gui.menu.MainMenuBar;
+import matcher.gui.undo.UndoManager;
 import matcher.srcprocess.BuiltinDecompiler;
 import matcher.type.ClassEnvironment;
 import matcher.type.MatchType;
@@ -71,6 +72,8 @@ public class Gui extends Application {
 
 		scene = new Scene(border, 1400, 800);
 		Shortcuts.init(this);
+
+		components.add(UndoManager.INSTANCE);
 
 		for (Consumer<Gui> l : loadListeners) {
 			l.accept(this);
