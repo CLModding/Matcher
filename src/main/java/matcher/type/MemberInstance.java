@@ -166,7 +166,7 @@ public abstract class MemberInstance<T extends MemberInstance<T>> implements Mat
 	}
 
 	public boolean hasMatchedHierarchy(MemberInstance<T> other) {
-		return hierarchyData.matchedHierarchy == other.hierarchyData;
+		return hierarchyData != null && hierarchyData.matchedHierarchy == other.hierarchyData;
 	}
 
 	public boolean hasHierarchyMatch() {
