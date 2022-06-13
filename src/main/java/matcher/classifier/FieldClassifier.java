@@ -27,14 +27,14 @@ public class FieldClassifier {
 		addClassifier(accessFlags, 4);
 		addClassifier(type, 10);
 		addClassifier(signature, 5);
-		addClassifier(readReferences, 6);
-		addClassifier(writeReferences, 6);
-		addClassifier(position, 3);
-		addClassifier(initValue, 7);
-		addClassifier(initStrings, 8);
+		addClassifier(readReferences, 9);
+		addClassifier(writeReferences, 9);
+		//addClassifier(position, 3);
+		addClassifier(initValue, 9);
+		addClassifier(initStrings, 10);
 		addClassifier(initCode, 10, ClassifierLevel.Intermediate, ClassifierLevel.Full, ClassifierLevel.Extra);
-		addClassifier(readRefsBci, 6, ClassifierLevel.Extra);
-		addClassifier(writeRefsBci, 6, ClassifierLevel.Extra);
+		addClassifier(readRefsBci, 9, ClassifierLevel.Extra);
+		addClassifier(writeRefsBci, 9, ClassifierLevel.Extra);
 	}
 
 	public static void addClassifier(AbstractClassifier classifier, double weight, ClassifierLevel... levels) {
