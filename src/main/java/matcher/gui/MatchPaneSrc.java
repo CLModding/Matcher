@@ -10,6 +10,7 @@ import javafx.scene.control.TreeView;
 import jfxtras.styles.jmetro.JMetroStyleClass;
 import matcher.NameType;
 import matcher.Util;
+import matcher.classifier.*;
 import matcher.gui.Gui.SortKey;
 import matcher.type.*;
 
@@ -20,6 +21,43 @@ public class MatchPaneSrc extends SplitPane implements IFwdGuiComponent, ISelect
 		this.gui = gui;
 
 		init();
+
+		rankComparator = (a, b) -> {
+			ClassifierLevel level = ClassifierLevel.Full;
+
+			if (!a.hasMatch() || !b.hasMatch() || !a.getCls().hasMatch() || !b.getCls().hasMatch()) {
+				return 0;
+			}
+
+			if (a instanceof MethodInstance methodA && b instanceof MethodInstance methodB) { // unmatched method
+				var resultsA = MethodClassifier.rank(methodA, methodA.getCls().getMatch().getMethods(), level, gui.getEnv(), MethodClassifier.getMaxScore(level));
+				var resultsB = MethodClassifier.rank(methodB, methodB.getCls().getMatch().getMethods(), level, gui.getEnv(), MethodClassifier.getMaxScore(level));
+
+				if (resultsA.size() == 0 || resultsB.size() == 0) {
+					return 0;
+				}
+
+				var firstResultA = resultsA.get(0);
+				var firstResultB = resultsB.get(0);
+
+				return Double.compare(firstResultB.getScore(), firstResultA.getScore());
+
+			} else if (a instanceof FieldInstance fieldA && b instanceof FieldInstance fieldB) { // unmatched field
+				var resultsA = FieldClassifier.rank(fieldA, fieldA.getCls().getMatch().getFields(), level, gui.getEnv(), MethodClassifier.getMaxScore(level));
+				var resultsB = FieldClassifier.rank(fieldB, fieldB.getCls().getMatch().getFields(), level, gui.getEnv(), MethodClassifier.getMaxScore(level));
+
+				if (resultsA.size() == 0 || resultsB.size() == 0) {
+					return 0;
+				}
+
+				var firstResultA = resultsA.get(0);
+				var firstResultB = resultsB.get(0);
+
+				return Double.compare(firstResultB.getScore(), firstResultA.getScore());
+			} else {
+				throw new IllegalStateException();
+			}
+		};
 	}
 
 	private void init() {
@@ -471,9 +509,15 @@ public class MatchPaneSrc extends SplitPane implements IFwdGuiComponent, ISelect
 		case MappedName:
 			return memberTypeComparator.thenComparing(this::getMappedName, clsNameComparator);
 		case MatchStatus:
-			return ((Comparator<MemberInstance<?>>) matchStatusComparator).thenComparing(memberTypeComparator).thenComparing(this::getName, clsNameComparator);
+			return ((Comparator<MemberInstance<?>>) matchStatusComparator)
+					.thenComparing(memberTypeComparator)
+					.thenComparing(rankComparator)
+					.thenComparing(this::getName, clsNameComparator);
 		case Similarity:
-			return ((Comparator<MemberInstance<?>>) similarityComparator).thenComparing(memberTypeComparator).thenComparing(this::getName, clsNameComparator);
+			return ((Comparator<MemberInstance<?>>) similarityComparator)
+					.thenComparing(memberTypeComparator)
+					.thenComparing(rankComparator)
+					.thenComparing(this::getName, clsNameComparator);
 		}
 
 		throw new IllegalStateException("unhandled sort key: "+gui.getSortKey());
@@ -604,6 +648,8 @@ public class MatchPaneSrc extends SplitPane implements IFwdGuiComponent, ISelect
 	private static final Comparator<? extends Matchable<?>> similarityComparator = (a, b) -> {
 		return Float.compare(a.getSimilarity(), b.getSimilarity());
 	};
+
+	private final Comparator<? super MemberInstance<?>> rankComparator;
 
 	private static final Comparator<String> clsNameComparator = Util::compareNatural;
 
